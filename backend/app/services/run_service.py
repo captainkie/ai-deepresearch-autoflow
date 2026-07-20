@@ -1,0 +1,354 @@
+"""RunService + RunHub — own the lifecycle of every research run.
+
+A :class:`RunHub` wraps one active run: the background ``asyncio.Task`` executing
+the engine, the set of connected SSE subscriber queues, and (M2 Task 7) the
+plan-approval future. The engine talks to the outside only through a *sink*; ours
+persists every event to SQLite **before** fanning it out to subscribers, so a
+reconnecting client that replays from the ``events`` table can never observe an
+event that live subscribers missed. The frontend de-dupes by ``seq``, so the
+replay/live overlap on ``subscribe`` is safe.
+
+Runs start lazily on first ``subscribe`` (stream connect) and keep running if the
+client disconnects — the task is independent of any subscriber generator.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Any
+from uuid import uuid4
+
+import httpx
+
+from app.api.schemas_api import CreateRun, RunConfigIn
+from app.core.engine import ResearchEngine
+from app.core.events import Sink
+from app.db.database import Database
+from app.db.repositories import EventRepo, RunRepo
+from app.models.schemas import Event, EventType, RunConfig, RunStatus
+from app.providers.crawl.registry import get_crawl_provider
+from app.providers.llm.registry import get_llm_provider
+from app.providers.search.registry import get_search_provider
+from app.services.config_service import ConfigService
+from app.services.provider_keys import get_key
+from app.settings import AppSettings
+
+logger = logging.getLogger(__name__)
+
+_TERMINAL = {EventType.done, EventType.error}
+
+
+def _now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _row_to_event(run_id: str, row: Any) -> Event:
+    return Event(
+        seq=row["seq"],
+        run_id=run_id,
+        ts=row["ts"],
+        type=row["type"],
+        data=json.loads(row["data_json"]),
+    )
+
+
+@dataclass
+class RunHub:
+    run_id: str
+    task: asyncio.Task | None = None
+    subscribers: set[asyncio.Queue] = field(default_factory=set)
+    finished: asyncio.Event = field(default_factory=asyncio.Event)
+    approval: asyncio.Future | None = None
+    cancelled: bool = False
+
+
+class RunService:
+    def __init__(
+        self, db: Database, config_service: ConfigService, app_settings: AppSettings
+    ) -> None:
+        self._db = db
+        self._config = config_service
+        self._app = app_settings
+        self._runs = RunRepo(db)
+        self._events = EventRepo(db)
+        self._hubs: dict[str, RunHub] = {}
+        self._lock = asyncio.Lock()
+        self._client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
+
+    # --- Create / query ------------------------------------------------------
+
+    async def create(self, create: CreateRun) -> str:
+        current = await self._config.current()
+        cfg_in = create.config or RunConfigIn()
+        # Demo default: providers fall back to the runtime config (mock in dev).
+        llm_provider = cfg_in.llm_provider or current["llm"]["provider"] or "mock"
+        llm_model = cfg_in.llm_model or current["llm"]["model"] or "mock-1"
+        search_provider = cfg_in.search_provider or current["search"]["provider"] or "mock"
+        crawl_provider = "mock"  # not exposed in the contract yet; mock in dev
+        template = create.template or "deep_research"
+        language = create.language or self._app.default_language
+        require = create.require_plan_approval
+        if require is None:
+            require = current["require_plan_approval"]
+
+        run_id = uuid4().hex
+        now = _now_iso()
+        await self._runs.create(
+            id=run_id,
+            query=create.query,
+            template=template,
+            language=language,
+            require_plan_approval=bool(require),
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            search_provider=search_provider,
+            crawl_provider=crawl_provider,
+            status=RunStatus.queued.value,
+            created_at=now,
+            updated_at=now,
+        )
+        return run_id
+
+    async def exists(self, run_id: str) -> bool:
+        return await self._runs.get(run_id) is not None
+
+    async def list_runs(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "run_id": r["id"],
+                "query": r["query"],
+                "template": r["template"],
+                "status": r["status"],
+                "created_at": r["created_at"],
+                "title": r["title"],
+            }
+            for r in await self._runs.list()
+        ]
+
+    async def get_detail(self, run_id: str) -> dict[str, Any] | None:
+        row = await self._runs.get(run_id)
+        if row is None:
+            return None
+        sections = await self._runs.get_sections(run_id)
+        sources = await self._runs.get_sources(run_id)
+        return {
+            "run_id": row["id"],
+            "query": row["query"],
+            "template": row["template"],
+            "language": row["language"],
+            "status": row["status"],
+            "title": row["title"],
+            "require_plan_approval": bool(row["require_plan_approval"]),
+            "config": {
+                "llm_provider": row["llm_provider"],
+                "llm_model": row["llm_model"],
+                "search_provider": row["search_provider"],
+                "crawl_provider": row["crawl_provider"],
+            },
+            "report": row["report_markdown"],
+            "error": row["error"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+            "plan": await self._plan_from_events(run_id),
+            "sections": [
+                {
+                    "id": s["id"],
+                    "idx": s["idx"],
+                    "title": s["title"],
+                    "goal": s["goal"],
+                    "queries": json.loads(s["queries_json"]) if s["queries_json"] else [],
+                    "summary": s["summary"],
+                    "status": s["status"],
+                }
+                for s in sections
+            ],
+            "sources": [
+                {
+                    "id": s["ref_num"],
+                    "title": s["title"],
+                    "url": s["url"],
+                    "snippet": s["snippet"],
+                    "section_id": s["section_id"],
+                }
+                for s in sources
+            ],
+        }
+
+    async def _plan_from_events(self, run_id: str) -> dict[str, Any] | None:
+        for row in reversed(await self._events.list_by_run(run_id)):
+            if row["type"] == EventType.plan.value:
+                data = json.loads(row["data_json"])
+                return {"brief": data.get("brief", ""), "sections": data.get("sections", [])}
+        return None
+
+    # --- Execution -----------------------------------------------------------
+
+    async def ensure_started(self, run_id: str) -> RunHub:
+        async with self._lock:
+            hub = self._hubs.get(run_id)
+            if hub is None:
+                if await self._runs.get(run_id) is None:
+                    raise LookupError(run_id)
+                hub = RunHub(run_id=run_id)
+                self._hubs[run_id] = hub
+            if hub.task is not None:
+                return hub
+
+            query, config = await self._resolve_run(run_id)
+            llm = get_llm_provider(config, get_key)
+            search = get_search_provider(config, self._client, get_key)
+            crawl = get_crawl_provider(config, self._client, get_key)
+            hub.task = asyncio.create_task(
+                self._run(run_id, query, config, hub, llm, search, crawl)
+            )
+            return hub
+
+    async def _resolve_run(self, run_id: str) -> tuple[str, RunConfig]:
+        row = await self._runs.get(run_id)
+        if row is None:
+            raise LookupError(run_id)
+        config = RunConfig(
+            llm_provider=row["llm_provider"] or "mock",
+            llm_model=row["llm_model"] or "mock-1",
+            search_provider=row["search_provider"] or "mock",
+            crawl_provider=row["crawl_provider"] or "mock",
+            language=row["language"] or "en",
+            template=row["template"],
+            require_plan_approval=bool(row["require_plan_approval"]),
+        )
+        return row["query"], config
+
+    async def _run(self, run_id, query, config, hub, llm, search, crawl) -> None:
+        engine = ResearchEngine(llm=llm, search=search, crawl=crawl)
+        sink = self._make_sink(run_id, hub)
+        approval = self._make_approval(config, hub)
+        try:
+            await engine.run(run_id, query, config, sink, approval)
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001 - engine already emitted an `error` event
+            logger.exception("run %s failed", run_id)
+        finally:
+            hub.finished.set()
+            for queue in list(hub.subscribers):
+                queue.put_nowait(None)
+
+    def _make_sink(self, run_id: str, hub: RunHub) -> Sink:
+        async def sink(event: Event) -> None:
+            await self._persist(run_id, event)
+            for queue in list(hub.subscribers):
+                queue.put_nowait(event)
+
+        return sink
+
+    def _make_approval(self, config: RunConfig, hub: RunHub):
+        # HITL plan approval is wired in Task 7; auto-run for now.
+        return None
+
+    async def _persist(self, run_id: str, event: Event) -> None:
+        now = _now_iso()
+        await self._events.append(
+            run_id,
+            seq=event.seq,
+            type_=event.type.value,
+            data_json=json.dumps(event.data),
+            ts=event.ts,
+        )
+        data = event.data
+        et = event.type
+        if et == EventType.plan:
+            for idx, section in enumerate(data.get("sections", [])):
+                await self._runs.upsert_section(
+                    run_id,
+                    id=section["id"],
+                    idx=idx,
+                    title=section.get("title", ""),
+                    goal=section.get("goal", ""),
+                    queries=section.get("queries", []),
+                    status="pending",
+                )
+        elif et == EventType.section_start:
+            await self._runs.set_section_status(run_id, data["section_id"], "researching")
+        elif et == EventType.source:
+            source = data.get("source", {})
+            await self._runs.insert_source(
+                run_id,
+                ref_num=source["id"],
+                title=source.get("title", ""),
+                url=source.get("url", ""),
+                snippet=source.get("snippet", ""),
+                section_id=source.get("section_id"),
+            )
+        elif et == EventType.section_done:
+            await self._runs.set_section_summary(
+                run_id, data["section_id"], data.get("summary", ""), "done"
+            )
+        elif et == EventType.report:
+            await self._runs.set_report(
+                run_id, data.get("markdown", ""), data.get("title", ""), now
+            )
+        elif et == EventType.status:
+            await self._runs.update_status(run_id, data.get("stage", ""), now)
+        elif et == EventType.awaiting_plan:
+            await self._runs.update_status(run_id, RunStatus.awaiting_plan.value, now)
+        elif et == EventType.done:
+            await self._runs.update_status(run_id, RunStatus.done.value, now)
+        elif et == EventType.error:
+            await self._runs.update_status(
+                run_id, RunStatus.error.value, now, error=data.get("message")
+            )
+
+    async def subscribe(self, run_id: str) -> AsyncIterator[Event]:
+        await self.ensure_started(run_id)
+        hub = self._hubs[run_id]
+        queue: asyncio.Queue = asyncio.Queue()
+        hub.subscribers.add(queue)
+        # If the run already finished, guarantee a stop signal for this late
+        # subscriber (see the atomic add/check reasoning in _run's fan-out).
+        if hub.finished.is_set():
+            queue.put_nowait(None)
+        try:
+            seen = -1
+            for row in await self._events.list_by_run(run_id):
+                event = _row_to_event(run_id, row)
+                yield event
+                seen = event.seq
+                if event.type in _TERMINAL:
+                    return
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                if item.seq <= seen:
+                    continue  # already replayed from the DB
+                yield item
+                seen = item.seq
+                if item.type in _TERMINAL:
+                    break
+        finally:
+            hub.subscribers.discard(queue)
+
+    async def cancel(self, run_id: str) -> None:
+        await self._runs.update_status(run_id, RunStatus.cancelled.value, _now_iso())
+        hub = self._hubs.get(run_id)
+        if hub is not None:
+            hub.cancelled = True
+            if hub.task is not None and not hub.task.done():
+                hub.task.cancel()
+
+    async def aclose(self) -> None:
+        for hub in self._hubs.values():
+            if hub.task is not None and not hub.task.done():
+                hub.task.cancel()
+        for hub in self._hubs.values():
+            if hub.task is not None:
+                try:
+                    await hub.task
+                except (asyncio.CancelledError, Exception):  # noqa: BLE001
+                    pass
+        await self._client.aclose()

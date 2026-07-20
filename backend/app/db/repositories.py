@@ -115,6 +115,12 @@ class RunRepo:
             (run_id, id, idx, title, goal, json.dumps(queries), status),
         )
 
+    async def set_section_status(self, run_id: str, section_id: str, status: str) -> None:
+        await self._db.execute(
+            "UPDATE sections SET status = ? WHERE run_id = ? AND id = ?",
+            (status, run_id, section_id),
+        )
+
     async def set_section_summary(
         self, run_id: str, section_id: str, summary: str, status: str
     ) -> None:

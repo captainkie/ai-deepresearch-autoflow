@@ -17,20 +17,25 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.__about__ import APP_NAME, VERSION
 from app.api import config as config_router
 from app.api import health as health_router
+from app.api import runs as runs_router
 from app.db.database import Database
 from app.services.config_service import ConfigService
+from app.services.run_service import RunService
 from app.settings import AppSettings, get_settings
 
 
 async def _startup(app: FastAPI, settings: AppSettings) -> None:
     db = Database(settings.db_path)
     await db.init()
+    config_service = ConfigService(db, settings)
     app.state.settings = settings
     app.state.db = db
-    app.state.config_service = ConfigService(db, settings)
+    app.state.config_service = config_service
+    app.state.run_service = RunService(db, config_service, settings)
 
 
 async def _shutdown(app: FastAPI) -> None:
+    await app.state.run_service.aclose()
     await app.state.db.close()
 
 
@@ -55,4 +60,5 @@ def create_app() -> FastAPI:
     )
     app.include_router(health_router.router)
     app.include_router(config_router.router)
+    app.include_router(runs_router.router)
     return app
