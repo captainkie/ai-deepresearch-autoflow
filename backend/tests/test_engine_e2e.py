@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import subprocess
+import sys
+
 import pytest
 
+from app.config import load_run_config
 from app.core.engine import ResearchEngine
 from app.core.events import ListSink
 from app.models.schemas import EventType, RunConfig, RunStatus
@@ -110,3 +114,35 @@ async def test_engine_emits_error_on_failure():
     with pytest.raises(RuntimeError):
         await _engine(llm=_BoomLLM()).run("run-3", "q", RunConfig(), sink)
     assert any(e.type == EventType.error for e in sink.events)
+
+
+def test_load_run_config_override_beats_env(monkeypatch):
+    monkeypatch.setenv("AUTOFLOW_LLM_PROVIDER", "mock")
+    monkeypatch.setenv("AUTOFLOW_LANGUAGE", "th")
+    cfg = load_run_config(language="en")  # explicit override wins over env
+    assert cfg.llm_provider == "mock"
+    assert cfg.language.value == "en"
+
+
+def test_cli_research_smoke():
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "app.cli",
+            "research",
+            "Analyze competitor brand: ExampleCo",
+            "--lang",
+            "en",
+            "--llm",
+            "mock",
+            "--search",
+            "mock",
+            "--crawl",
+            "mock",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "## Sources" in result.stdout
