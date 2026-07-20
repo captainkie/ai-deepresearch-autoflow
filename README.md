@@ -1,9 +1,10 @@
 <h1 align="center">🔎 AI DeepResearch AutoFlow</h1>
 
 <p align="center">
-  <b>Auto-research → deep research → detailed cited reports.</b><br/>
-  A secure, multi-user web platform that turns a research goal into a thorough,
-  source-cited report — built for marketing teams researching competitors and markets.
+  <b>Deep research your team can trust — self-hosted, secure, every claim cited &amp; verified.</b><br/>
+  A multi-user web platform that turns a research goal into a thorough, source-cited report with
+  claim-level verification, confidence, and surfaced contradictions —
+  built for marketing teams researching competitors and markets.
 </p>
 
 <p align="center">
@@ -28,14 +29,21 @@ plan, then watch the system search the web, read sources, and synthesize a detai
 
 ## Highlights
 
+- 🔐 **Secure by default** — API keys live in an encrypted vault (AES-256-GCM), write-only, with
+  revoke / expire / rotate and a full audit log. Hand the app to non-technical teammates; the admin
+  holds the keys.
+- ✅ **Verified, not just generated** *(Engine v2, in progress)* — every claim is grounded in a cited
+  source and checked by a separate verifier, with a **confidence** badge and **surfaced
+  contradictions**. The report body renders only verified claims; the rest goes to an "Unverified" appendix.
 - 🧠 **Custom async deep-research engine** — plan → parallel multi-step research loop →
-  compress → synthesize, with a live event stream (SSE).
-- 🔌 **Swappable providers** — LLM (Claude / OpenAI / Gemini via LiteLLM) and search
-  (Tavily / Serper / Exa / DuckDuckGo). Mock providers run the whole pipeline offline.
-- 🔐 **Secure key vault** — API keys encrypted at rest (AES-256-GCM), write-only, with
-  revoke / expire / rotate and a full audit log.
+  extract & verify claims → synthesize, with a live event stream (SSE) and adaptive stopping.
+- 🔌 **Swappable providers** — LLM (Claude / OpenAI / Gemini via LiteLLM, + z.ai GLM / Moonshot Kimi)
+  and search (Tavily / Serper / Exa / DuckDuckGo). Run the verifier on a cheap/fast model. Mock
+  providers run the whole pipeline offline.
 - 👥 **Auth + RBAC** — email/password + Google OAuth; `admin` / `member` / `viewer` roles;
   an admin panel to manage users and provider credentials.
+- 📊 **Marketing-grade reports** *(Engine v2, in progress)* — structured templates (Competitor
+  Teardown, Market Landscape, SWOT, Pricing) with cited, confidence-scored comparison tables.
 - 🌏 **i18n reports** — choose Thai or English output per job.
 - ✅ **Quality gates** — lint, type-check, tests, and secret-scanning in CI.
 
@@ -46,7 +54,9 @@ plan, then watch the system search the web, read sources, and synthesize a detai
 
 ## Status / roadmap
 
-Built in milestone PRs (see the design spec): engine core → API + DB → security/auth →
+Built in milestone PRs (see the design spec + the
+[Engine v2 addendum](./docs/superpowers/specs/2026-07-20-engine-v2-trust-templates.md)):
+engine core ✅ → API + DB ✅ → security/auth → **Engine v2 (verification + templates)** →
 frontend → admin panel → CI & docs.
 
 ## Authors
