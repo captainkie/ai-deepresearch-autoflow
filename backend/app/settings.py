@@ -10,16 +10,24 @@ M3). Env vars use the ``AUTOFLOW_`` prefix, e.g. ``AUTOFLOW_DB_PATH``.
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Annotated
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
 class AppSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="AUTOFLOW_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="AUTOFLOW_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     db_path: str = "./data/autoflow.db"
-    cors_origins: list[str] = ["http://localhost:3000"]
+    # ``NoDecode`` stops pydantic-settings from JSON-decoding the env value so the
+    # ``_split_origins`` validator can accept a plain comma-separated string.
+    cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     default_language: str = "en"
     default_require_plan_approval: bool = True
 
