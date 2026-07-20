@@ -106,12 +106,28 @@ plaintext), and the used credential's `last_used_at` + audit entry are recorded.
 **Sessions** — JWT access token (short TTL, ~15 min) + rotating **refresh token** stored
 (hashed) in DB and revocable; delivered as httpOnly, Secure, SameSite=Lax cookies.
 **Google OAuth** (Authorization Code + PKCE) as an additional sign-in; links to a user by
-verified email. Bootstrap admin created from env on first run if no users exist.
+verified email. The **first** user is created via the first-run setup flow (§6a), not env.
 
-**RBAC** — roles `admin | member | viewer`, enforced by FastAPI dependencies:
-- admin: manage users, providers/credentials, settings, view audit log, access all runs.
+**RBAC** — roles `superadmin | admin | member | viewer`, enforced by FastAPI dependencies:
+- superadmin: everything, incl. system-owner actions — manage admins, rotate the master key,
+  system settings. Created once by first-run setup; there is always ≥1 superadmin.
+- admin: manage members/viewers, providers/credentials, view audit log, access all runs.
 - member: create runs, view/manage own runs, view shared reports.
 - viewer: read shared reports only.
+
+### 6a. First-run Setup (Strapi-style)
+
+On a fresh install the `users` table is empty and the app is in **setup mode**:
+- `GET /api/setup/status → { needs_setup: bool }` (true iff no users exist).
+- The frontend, when `needs_setup`, routes everything to **`/setup`** — a one-time onboarding
+  page to register the **superadmin** (name, email, password, with a strength check).
+- `POST /api/setup` creates the first user with role `superadmin`, then marks
+  `settings.setup_completed = true`. It is **guarded to run only when zero users exist**
+  (returns `409` otherwise), so it can never be replayed to seize the instance.
+- After setup, `/setup` 404s/redirects to `/login`. No superadmin credentials ever live in
+  env or code — the operator sets them through the browser on first launch.
+- A separate env checklist (master key, OAuth client, provider base URLs) is validated at
+  startup and surfaced on the setup page as readiness indicators.
 
 **Secret Vault (API keys)** — table `provider_credentials`:
 `id, provider, label, ciphertext, nonce, key_version, masked_hint, created_by, created_at,
@@ -134,8 +150,8 @@ expires_at, status(active|revoked), last_used_at`.
 `refresh_tokens(id, user_id, token_hash, expires_at, revoked_at, user_agent)` ·
 `provider_credentials(… see §6)` ·
 `audit_log(id, actor_id, action, target_type, target_id, meta_json, created_at)` ·
-`settings(key, value_json)` — runtime config (active providers/models, default language,
-require_plan_approval) ·
+`settings(key, value_json)` — runtime config (`setup_completed`, active providers/models,
+default language, require_plan_approval) ·
 `runs(id, owner_id, query, template, language, status, title, created_at, updated_at,
 error?)` · `sections(id, run_id, idx, title, goal, queries_json, summary?, status)` ·
 `sources(id, run_id, ref_num, section_id?, title, url, snippet)` ·
@@ -147,6 +163,7 @@ at startup.
 ## 8. API
 
 Full contract in `docs/API_CONTRACT.md`. Summary of groups:
+- **Setup** — `GET /api/setup/status`, `POST /api/setup` (one-time superadmin; §6a).
 - **Auth** — `POST /api/auth/register`, `/login`, `/logout`, `/refresh`, `GET /api/auth/me`,
   Google: `GET /api/auth/google/start`, `GET /api/auth/google/callback`.
 - **Runs** — `POST /api/runs`, `GET /api/runs`, `GET /api/runs/{id}`,
@@ -160,10 +177,11 @@ The API contract doc will be extended with the auth/admin shapes before those mi
 
 ## 9. Frontend (Next.js)
 
-Screens: **Login/Register** (email + "Continue with Google") · **Home** (query + template +
-language) · **Run** (live timeline, plan-review card, streamed report with TOC + copy/
-download) · **History** · **Settings** (providers/models/language/HITL toggle) ·
-**Admin** (users, credentials add/revoke/expire/rotate, audit log). Nav is role-gated.
+Screens: **Setup** (first-run superadmin onboarding, Strapi-style; §6a) · **Login/Register**
+(email + "Continue with Google") · **Home** (query + template + language) · **Run** (live
+timeline, plan-review card, streamed report with TOC + copy/download) · **History** ·
+**Settings** (providers/models/language/HITL toggle) · **Admin** (users, credentials
+add/revoke/expire/rotate, audit log). Nav is role-gated; setup mode overrides all routes.
 Polished, editorial, premium look (frontend-design + shadcn), light/dark, excellent report
 typography. Talks to the backend via the typed client from the API contract.
 
@@ -176,15 +194,38 @@ typography. Talks to the backend via the typed client from the API contract.
 - **pre-commit** mirrors the fast checks locally.
 - Definition of done per PR: gates green, no secrets, docs updated.
 
+## 10a. Documentation (a first-class deliverable)
+
+Docs must let a newcomer **understand, install, and run** the project unaided:
+- **README.md** — front door: what/why, feature highlights, **product screenshots**, a
+  copy-paste **Quickstart** (offline mock mode → real providers), architecture diagram,
+  links to deeper docs.
+- **Product screenshots/GIF** — captured with **Playwright** driving the finished app in
+  **mock mode** (deterministic seed data → stable, safe images with no real keys/PII). Stored
+  under `docs/screenshots/` and embedded in the README + relevant docs. This runs in
+  milestone 6, **after** the UI is complete; a small capture script makes them reproducible.
+- **docs/INSTALL.md** — prerequisites (Python/uv, Node/pnpm), clone, backend + frontend setup,
+  `.env` files, **first-run superadmin** walkthrough, dev + prod run commands, troubleshooting.
+- **docs/CONFIGURATION.md** — every env var (incl. `AUTOFLOW_MASTER_KEY`, Google OAuth,
+  provider base URLs), how to generate the master key, choosing providers, language defaults.
+- **docs/SECURITY.md** — vault design, threat model, key rotation, reporting vulnerabilities.
+- **docs/ARCHITECTURE.md** — engine loop, layering, data flow, extension points (add a provider).
+- **backend/.env.example** + **frontend/.env.example** — all vars documented, no real secrets.
+- Inline: concise docstrings on public modules; the API contract stays authoritative for shapes.
+- Docs are updated in the same PR as the code they describe (enforced by DoD above).
+
 ## 11. Build Order (milestone PRs, GitHub flow)
 
 Each is a branch → PR → merge into `main`:
 1. **Scaffold + engine core + providers + mocks + CLI + tests** — E2E works offline.
 2. **API + SQLite + SSE + config/templates** — engine reachable over HTTP with persistence.
-3. **Security: vault (AES-256-GCM), auth (pwd+JWT+refresh), RBAC, audit; Google OAuth.**
-4. **Frontend: auth + research UX + streaming + report.**
+3. **Security: vault (AES-256-GCM), auth (pwd+JWT+refresh), RBAC, audit, first-run setup
+   (§6a); Google OAuth.**
+4. **Frontend: setup + auth + research UX + streaming + report.**
 5. **Frontend: admin panel (users, credentials, audit) + settings.**
-6. **CI, README, THIRD_PARTY_NOTICES, polish, hardening.**
+6. **CI, full docs (§10a), README, THIRD_PARTY_NOTICES, polish, hardening.**
+
+Docs land incrementally with each milestone; milestone 6 completes and polishes them.
 
 ## 12. Open Source / Attribution
 
