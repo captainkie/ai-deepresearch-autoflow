@@ -20,7 +20,13 @@ Base URL (dev): `http://localhost:8000`. All JSON. SSE endpoints use `text/event
 ### `GET /api/templates`
 List research templates. `200 → { "templates": Template[] }`
 ```ts
-type Template = { id: string; name: string; description: string; audience: string }
+type Template = {
+  id: string; name: string; description: string; audience: string;
+  // Engine v2 (additive, optional — list view needs only the fields above):
+  entity_mode?: boolean;                                          // template compares entities (e.g. brands)
+  entity_schema?: { key: string; label: string; type: "text" | "list" }[];
+  verification_level?: "off" | "light" | "strict";
+}
 ```
 
 ### `GET /api/config`
@@ -89,13 +95,18 @@ type EventType =
   | "awaiting_plan" // {} — paused for human approval
   | "search"        // { section_id: string; query: string }
   | "source"        // { section_id: string; source: Source }
+  | "claim"         // { claim_id: string; section_id: string; text: string; entity?: string; attribute?: string; source_ids: number[]; quote?: string }  (Engine v2)
+  | "verification"  // { claim_id: string; verdict: "supported"|"partial"|"unsupported"|"contradicted"; confidence: number; rationale?: string }  (Engine v2)
+  | "contradiction" // { id: string; entity?: string; attribute?: string; claim_ids: [string, string]; note?: string }  (Engine v2)
   | "note"          // { section_id: string; content: string }  (a compressed finding / reflection)
   | "section_start" // { section_id: string; title: string }
   | "section_done"  // { section_id: string; summary: string; source_count: number }
   | "report_delta"  // { text: string }  (streamed final-report tokens)
-  | "report"        // { markdown: string; title: string }  (full final report)
+  | "report"        // { markdown: string; title: string; confidence_summary?: ConfidenceSummary }  (full final report)
   | "error"         // { message: string }
-  | "done"          // { title: string; source_count: number }
+  | "done"          // { title: string; source_count: number; confidence_summary?: ConfidenceSummary }
+
+type ConfidenceSummary = { high: number; medium: number; low: number; contradictions: number }  // Engine v2
 
 type PlanSection = { id: string; title: string; goal: string; queries: string[] }
 type Source = { id: number; title: string; url: string; snippet: string; section_id?: string }
@@ -104,6 +115,9 @@ type Source = { id: number; title: string; url: string; snippet: string; section
 ### Event ordering (happy path)
 ```
 status(planning) → plan → [awaiting_plan → (POST /plan)] →
-  for each section: section_start → search* → source* → note* → section_done
+  for each section: section_start → search* → source* → claim* → verification* → (contradiction*) → note* → section_done
 status(writing) → report_delta* → report → done
+
+(Engine v2 adds the claim/verification/contradiction events; on older/`verification_level:off`
+runs they simply don't appear, and clients de-dupe by `seq` as before.)
 ```

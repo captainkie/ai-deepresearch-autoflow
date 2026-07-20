@@ -3,6 +3,12 @@
 **Date:** 2026-07-20 · **Status:** Draft for review · **Owner:** captainkie (Narenrit)
 **Repo (planned):** `github.com/captainkie/ai-deepresearch-autoflow` (public, MIT)
 
+> **Amended by `2026-07-20-engine-v2-trust-templates.md`** (Engine v2: claim-level
+> verification, contradiction detection, confidence scoring, adaptive stopping, and structured
+> marketing templates). That addendum supersedes parts of §1, §4, §5, §7, §8, §11, §13 below;
+> read it alongside this document. Positioning north star:
+> *"Deep research your team can trust — self-hosted, secure, every claim cited and verified."*
+
 ## 1. Problem & Goal
 
 The office marketing team needs to research topics (especially **competitor brands** and
@@ -55,6 +61,13 @@ event sink, never on FastAPI, the DB, or HTTP. This keeps it unit-testable and r
 
 Custom async orchestrator (no LangGraph); borrows LangGraph's *patterns*.
 
+> **Engine v2 (see addendum):** stages 3–4 below evolve so that a **claim** is the atomic unit:
+> research *extracts claims* (each with a source quote), a separate **verifier** role checks each
+> claim against its source text, contradictions across sources are surfaced, findings carry a
+> **confidence** label, and the final report is a *projection of verified claims* (unsupported ones
+> go to an "Unverified" appendix). Stopping becomes **adaptive** (diminishing returns / confidence /
+> budget), not iteration-count-driven. New event/data shapes in the addendum §6–§7.
+
 **Stages**
 1. **Plan** — `planner.py`: LLM turns the query + template + target language into a
    `ResearchBrief` and an ordered list of `PlanSection`s, each with `title`, `goal`, and
@@ -91,6 +104,9 @@ Each provider family: an interface (`base.py`), concrete adapters, a **mock**, a
 - **LLM** — via **LiteLLM** (one call surface for Anthropic/OpenAI/Gemini/OpenAI-compatible).
   Interface: `complete(messages, …) -> str` and `stream(messages, …) -> AsyncIterator[str]`.
   Mock returns deterministic canned plans/notes/reports for offline E2E tests.
+  *(Engine v2)* the **verifier** runs on a separately-configurable cheap/fast model
+  (`verifier_provider`/`verifier_model`, e.g. Haiku / GLM / Kimi) — this is the concrete payoff of
+  the provider abstraction, not a demo feature.
 - **Search** — adapters: **Tavily, Serper, Exa, DuckDuckGo** (keyless) + mock.
   Interface: `search(query, k) -> list[SearchResult]`.
 - **Crawl** — adapters: **Jina reader** (`r.jina.ai`, clean markdown), **trafilatura**
@@ -159,6 +175,10 @@ error?)` · `sections(id, run_id, idx, title, goal, queries_json, summary?, stat
 
 Access via small repository modules; a lightweight migration runner creates/updates schema
 at startup.
+
+*(Engine v2, see addendum §6)* adds `claims`, `claim_sources` (m2m to `sources.ref_num`),
+`verifications`, and `contradictions` for the verified-claim model; `sources` stays the global
+numbered registry.
 
 ## 8. API
 
@@ -230,11 +250,16 @@ Each is a branch → PR → merge into `main`:
 2. **API + SQLite + SSE + config/templates** — engine reachable over HTTP with persistence.
 3. **Security: vault (AES-256-GCM), auth (pwd+JWT+refresh), RBAC, audit, first-run setup
    (§6a); Google OAuth.**
-4. **Frontend: setup + auth + research UX + streaming + report.**
-5. **Frontend: admin panel (users, credentials, audit) + settings.**
-6. **CI, full docs (§10a), README, THIRD_PARTY_NOTICES, polish, hardening.**
+4. **Engine v2 (addendum):** claim extraction + verifier role/model routing + contradiction
+   detection + confidence scoring + adaptive stopping + structured templates & comparison-table
+   synthesis (new tables/events). *Comes before the research-UX frontend so the UI is built once
+   against the final report/event shape.*
+5. **Frontend: setup + auth + research UX + streaming + report** — incl. confidence badges,
+   contradiction flags, and the comparison table.
+6. **Frontend: admin panel (users, credentials, audit) + settings** (+ verifier model / verification level).
+7. **CI, full docs (§10a), README (hero rewrite per addendum §1), THIRD_PARTY_NOTICES, polish, hardening.**
 
-Docs land incrementally with each milestone; milestone 6 completes and polishes them.
+Docs land incrementally with each milestone; the final milestone completes and polishes them.
 
 ## 12. Open Source / Attribution
 
@@ -248,6 +273,9 @@ langchain-ai/open_deep_research (MIT), bytedance/deer-flow (MIT), karpathy/autor
 - **Key leakage** — mitigated by write-only vault, encryption at rest, no plaintext in
   logs/responses, gitleaks, gitignored secrets. Highest-priority test coverage.
 - **Provider cost/latency/rate limits** — concurrency caps, backoff, caching, loop limits.
-- **Report quality** — good per-stage prompts, goal-directed page summarization, citation
-  discipline; mock-based tests assert structure, real providers assert end-to-end shape.
+- **Report quality / hallucination** — *(Engine v2)* claim-level grounding + a separate verifier +
+  confidence + contradiction surfacing; the report body renders only verified claims (unsupported →
+  appendix). Cost/latency mitigated by batching, candidate-only verification, a cheap verifier model,
+  and `verification_level` (default `light`). Mock-based tests assert structure incl.
+  "body contains no unverified claims"; real providers assert end-to-end shape.
 - **Scope size** — controlled by strict milestone PRs; each milestone is independently useful.
