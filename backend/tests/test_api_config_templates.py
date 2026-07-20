@@ -52,3 +52,33 @@ async def test_current_and_update_roundtrip(config_service):
     )
     assert updated["llm"]["provider"] == "anthropic"
     assert updated["require_plan_approval"] is False
+
+
+async def test_templates_endpoint(client):
+    resp = await client.get("/api/templates")
+    assert resp.status_code == 200
+    templates = resp.json()["templates"]
+    assert len(templates) >= 3
+    ids = {t["id"] for t in templates}
+    assert "deep_research" in ids
+    for t in templates:
+        assert {"id", "name", "description", "audience"} <= t.keys()
+
+
+async def test_get_config_endpoint(client):
+    resp = await client.get("/api/config")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "mock" in body["llm"]["available"]
+    assert "mock" in body["search"]["available"]
+    assert "require_plan_approval" in body
+
+
+async def test_post_config_persists(client):
+    resp = await client.post("/api/config", json={"search_provider": "duckduckgo"})
+    assert resp.status_code == 200
+    assert resp.json()["search"]["provider"] == "duckduckgo"
+
+    # Persisted across requests (same in-memory DB / app.state).
+    resp2 = await client.get("/api/config")
+    assert resp2.json()["search"]["provider"] == "duckduckgo"
