@@ -16,8 +16,7 @@ class TrafilaturaCrawlProvider:
             import trafilatura
         except ImportError as exc:  # pragma: no cover - depends on optional extra
             raise RuntimeError(
-                "trafilatura is not installed; install the extra with "
-                "`uv sync --extra crawl`"
+                "trafilatura is not installed; install the extra with `uv sync --extra crawl`"
             ) from exc
         try:
             response = await self._client.get(url)

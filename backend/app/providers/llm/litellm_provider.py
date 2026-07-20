@@ -31,7 +31,9 @@ class LiteLLMProvider:
     def model(self) -> str:
         return model_string(self._provider, self._model)
 
-    def _base_kwargs(self, messages: list[dict], temperature: float, max_tokens: int | None) -> dict:
+    def _base_kwargs(
+        self, messages: list[dict], temperature: float, max_tokens: int | None
+    ) -> dict:
         kwargs: dict = {
             "model": self.model,
             "messages": messages,

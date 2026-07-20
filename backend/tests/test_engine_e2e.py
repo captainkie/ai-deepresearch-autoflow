@@ -45,9 +45,7 @@ async def test_engine_e2e_event_order_and_report():
 
     idx_plan = _first_index(events, lambda e: e.type == EventType.plan)
     idx_first_start = _first_index(events, lambda e: e.type == EventType.section_start)
-    last_section_done = max(
-        i for i, e in enumerate(events) if e.type == EventType.section_done
-    )
+    last_section_done = max(i for i, e in enumerate(events) if e.type == EventType.section_done)
     idx_writing = _first_index(
         events,
         lambda e: e.type == EventType.status and e.data["stage"] == RunStatus.writing.value,
@@ -66,13 +64,15 @@ async def test_engine_e2e_event_order_and_report():
             sid = e.data["section_id"]
             start_i = _first_index(
                 events,
-                lambda ev, sid=sid: ev.type == EventType.section_start
-                and ev.data["section_id"] == sid,
+                lambda ev, sid=sid: (
+                    ev.type == EventType.section_start and ev.data["section_id"] == sid
+                ),
             )
             done_i = _first_index(
                 events,
-                lambda ev, sid=sid: ev.type == EventType.section_done
-                and ev.data["section_id"] == sid,
+                lambda ev, sid=sid: (
+                    ev.type == EventType.section_done and ev.data["section_id"] == sid
+                ),
             )
             assert start_i < done_i
 

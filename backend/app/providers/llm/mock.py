@@ -102,9 +102,7 @@ class MockLLMProvider:
 
     def _report(self, messages: list[dict]) -> str:
         title = (
-            _marker(messages, "OBJECTIVE")
-            or _marker(messages, "QUERY")
-            or "Deep Research Report"
+            _marker(messages, "OBJECTIVE") or _marker(messages, "QUERY") or "Deep Research Report"
         )
         return (
             f"# {title}\n\n"
