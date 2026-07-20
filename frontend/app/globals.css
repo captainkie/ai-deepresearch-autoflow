@@ -1,0 +1,443 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* next-themes uses a class strategy — make `dark:` key off the .dark class. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * AutoFlow Research — "Editorial Research Desk"
+ * A calm, premium editorial system. Warm paper + ink in light mode,
+ * deep warm charcoal in dark mode, with a restrained pine-green accent.
+ */
+
+:root {
+  --radius: 0.7rem;
+
+  /* Paper & ink */
+  --background: oklch(0.985 0.006 85);
+  --foreground: oklch(0.24 0.012 62);
+
+  --card: oklch(0.997 0.004 85);
+  --card-foreground: oklch(0.24 0.012 62);
+
+  --popover: oklch(0.997 0.004 85);
+  --popover-foreground: oklch(0.24 0.012 62);
+
+  /* Pine green */
+  --primary: oklch(0.44 0.066 166);
+  --primary-foreground: oklch(0.98 0.014 150);
+
+  /* Warm sand */
+  --secondary: oklch(0.95 0.013 82);
+  --secondary-foreground: oklch(0.31 0.02 70);
+
+  --muted: oklch(0.955 0.009 82);
+  --muted-foreground: oklch(0.505 0.013 72);
+
+  --accent: oklch(0.94 0.018 80);
+  --accent-foreground: oklch(0.30 0.02 70);
+
+  --destructive: oklch(0.52 0.16 26);
+  --destructive-foreground: oklch(0.98 0.01 60);
+
+  --border: oklch(0.895 0.009 80);
+  --input: oklch(0.895 0.009 80);
+  --ring: oklch(0.44 0.066 166);
+
+  /* Warm amber signal used for "in progress" states */
+  --signal: oklch(0.72 0.13 65);
+
+  /* Charts (editorial palette) */
+  --chart-1: oklch(0.44 0.066 166);
+  --chart-2: oklch(0.62 0.11 190);
+  --chart-3: oklch(0.72 0.13 65);
+  --chart-4: oklch(0.55 0.15 25);
+  --chart-5: oklch(0.50 0.09 300);
+
+  --sidebar: oklch(0.975 0.007 85);
+  --sidebar-foreground: oklch(0.24 0.012 62);
+  --sidebar-primary: oklch(0.44 0.066 166);
+  --sidebar-primary-foreground: oklch(0.98 0.014 150);
+  --sidebar-accent: oklch(0.94 0.018 80);
+  --sidebar-accent-foreground: oklch(0.30 0.02 70);
+  --sidebar-border: oklch(0.895 0.009 80);
+  --sidebar-ring: oklch(0.44 0.066 166);
+}
+
+.dark {
+  /* Deep warm charcoal */
+  --background: oklch(0.175 0.008 75);
+  --foreground: oklch(0.93 0.008 84);
+
+  --card: oklch(0.208 0.008 75);
+  --card-foreground: oklch(0.93 0.008 84);
+
+  --popover: oklch(0.212 0.008 75);
+  --popover-foreground: oklch(0.93 0.008 84);
+
+  /* Mint-pine, brightened for dark surfaces */
+  --primary: oklch(0.80 0.12 166);
+  --primary-foreground: oklch(0.22 0.04 166);
+
+  --secondary: oklch(0.27 0.01 76);
+  --secondary-foreground: oklch(0.92 0.008 84);
+
+  --muted: oklch(0.255 0.008 76);
+  --muted-foreground: oklch(0.71 0.011 80);
+
+  --accent: oklch(0.29 0.012 76);
+  --accent-foreground: oklch(0.93 0.008 84);
+
+  --destructive: oklch(0.64 0.17 26);
+  --destructive-foreground: oklch(0.97 0.01 60);
+
+  --border: oklch(0.32 0.01 76);
+  --input: oklch(0.35 0.011 76);
+  --ring: oklch(0.80 0.12 166);
+
+  --signal: oklch(0.78 0.13 70);
+
+  --chart-1: oklch(0.80 0.12 166);
+  --chart-2: oklch(0.70 0.11 190);
+  --chart-3: oklch(0.78 0.13 70);
+  --chart-4: oklch(0.65 0.16 25);
+  --chart-5: oklch(0.65 0.10 300);
+
+  --sidebar: oklch(0.20 0.008 75);
+  --sidebar-foreground: oklch(0.93 0.008 84);
+  --sidebar-primary: oklch(0.80 0.12 166);
+  --sidebar-primary-foreground: oklch(0.22 0.04 166);
+  --sidebar-accent: oklch(0.29 0.012 76);
+  --sidebar-accent-foreground: oklch(0.93 0.008 84);
+  --sidebar-border: oklch(0.32 0.01 76);
+  --sidebar-ring: oklch(0.80 0.12 166);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-signal: var(--signal);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, -apple-system,
+    sans-serif;
+  --font-display: var(--font-fraunces), ui-serif, Georgia, "Times New Roman",
+    serif;
+  --font-serif: var(--font-newsreader), ui-serif, Georgia, serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo,
+    monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --shadow-soft: 0 1px 2px oklch(0.24 0.012 62 / 0.04),
+    0 8px 24px -12px oklch(0.24 0.012 62 / 0.12);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv05", "cv11", "ss01";
+  }
+
+  /* Paper grain — extremely subtle texture for warmth (light mode only) */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.4;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+  .dark body::before {
+    opacity: 0.5;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--primary) 22%, transparent);
+  }
+}
+
+/* ---- Editorial helpers ------------------------------------------------- */
+
+.font-display {
+  font-family: var(--font-display);
+}
+.font-reading {
+  font-family: var(--font-serif);
+}
+
+.eyebrow {
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+/* Hairline top-border accent used on cards / rails */
+.rule-accent {
+  background-image: linear-gradient(
+    to right,
+    var(--primary),
+    color-mix(in oklch, var(--primary) 25%, transparent)
+  );
+}
+
+/* Streaming shimmer for "thinking" lines */
+@keyframes af-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.shimmer-line {
+  background: linear-gradient(
+    90deg,
+    var(--muted) 25%,
+    color-mix(in oklch, var(--muted-foreground) 18%, var(--muted)) 50%,
+    var(--muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: af-shimmer 1.8s ease-in-out infinite;
+}
+
+/* Live pulse dot */
+@keyframes af-pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in oklch, var(--signal) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 6px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.pulse-dot {
+  animation: af-pulse-ring 1.8s ease-out infinite;
+}
+
+/* Timeline vertical spine */
+.timeline-spine {
+  background: linear-gradient(
+    to bottom,
+    color-mix(in oklch, var(--border) 30%, transparent),
+    var(--border),
+    color-mix(in oklch, var(--border) 30%, transparent)
+  );
+}
+
+/* ---- Report prose (the deliverable) ------------------------------------ */
+
+.report-prose {
+  font-family: var(--font-serif);
+  color: var(--foreground);
+  font-size: 1.075rem;
+  line-height: 1.78;
+  font-weight: 420;
+  letter-spacing: 0.001em;
+  max-width: 42rem;
+}
+.report-prose > :first-child {
+  margin-top: 0;
+}
+.report-prose p {
+  margin: 1.05em 0;
+  text-wrap: pretty;
+}
+.report-prose h1,
+.report-prose h2,
+.report-prose h3,
+.report-prose h4 {
+  font-family: var(--font-display);
+  color: var(--foreground);
+  font-weight: 560;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  scroll-margin-top: 6rem;
+}
+.report-prose h1 {
+  font-size: 2.1rem;
+  margin: 0 0 0.6em;
+}
+.report-prose h2 {
+  font-size: 1.5rem;
+  margin: 2em 0 0.6em;
+  padding-top: 1.4em;
+  border-top: 1px solid var(--border);
+}
+.report-prose h3 {
+  font-size: 1.2rem;
+  margin: 1.6em 0 0.5em;
+}
+.report-prose h4 {
+  font-size: 1.02rem;
+  margin: 1.4em 0 0.4em;
+  font-weight: 600;
+}
+.report-prose a {
+  color: var(--primary);
+  text-decoration: none;
+  border-bottom: 1px solid
+    color-mix(in oklch, var(--primary) 35%, transparent);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.report-prose a:hover {
+  border-bottom-color: var(--primary);
+}
+/* Inline citation markers like [1] rendered as links */
+.report-prose a[href^="#source"],
+.report-prose sup a {
+  font-family: var(--font-sans);
+  font-size: 0.7em;
+  font-weight: 600;
+  vertical-align: super;
+  line-height: 0;
+  border: none;
+  padding: 0 0.1em;
+}
+.report-prose strong {
+  font-weight: 640;
+  color: var(--foreground);
+}
+.report-prose em {
+  font-style: italic;
+}
+.report-prose ul,
+.report-prose ol {
+  margin: 1.05em 0;
+  padding-left: 1.4em;
+}
+.report-prose li {
+  margin: 0.4em 0;
+  padding-left: 0.25em;
+}
+.report-prose li::marker {
+  color: var(--primary);
+}
+.report-prose ul > li::marker {
+  content: "—  ";
+}
+.report-prose blockquote {
+  margin: 1.4em 0;
+  padding: 0.2em 0 0.2em 1.25em;
+  border-left: 2px solid var(--primary);
+  font-style: italic;
+  color: var(--muted-foreground);
+}
+.report-prose blockquote p {
+  margin: 0.4em 0;
+}
+.report-prose code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--muted);
+  padding: 0.15em 0.4em;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.report-prose pre {
+  font-family: var(--font-mono);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 1em 1.15em;
+  overflow-x: auto;
+  margin: 1.3em 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+}
+.report-prose pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+}
+.report-prose hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2.2em 0;
+}
+.report-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.4em 0;
+  font-family: var(--font-sans);
+  font-size: 0.9rem;
+  display: block;
+  overflow-x: auto;
+}
+.report-prose th,
+.report-prose td {
+  border: 1px solid var(--border);
+  padding: 0.55em 0.8em;
+  text-align: left;
+  vertical-align: top;
+}
+.report-prose th {
+  background: var(--muted);
+  font-weight: 600;
+}
+.report-prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-md);
+  margin: 1.4em 0;
+}
+
+/* Thin custom scrollbars for rails */
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklch, var(--muted-foreground) 40%, transparent)
+    transparent;
+}

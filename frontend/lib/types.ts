@@ -1,0 +1,142 @@
+/**
+ * AutoFlow Research — shared types.
+ *
+ * Mirrors `docs/API_CONTRACT.md` verbatim. Keep this file in lock-step with the
+ * backend contract; it is the single source of truth for the typed API client
+ * and the SSE stream hook.
+ */
+
+// ---------------------------------------------------------------------------
+// Templates & config
+// ---------------------------------------------------------------------------
+
+export type Template = {
+  id: string;
+  name: string;
+  description: string;
+  audience: string;
+};
+
+export type ConfigResponse = {
+  llm: { provider: string; model: string; available: string[] };
+  search: { provider: string; available: string[] };
+  require_plan_approval: boolean;
+};
+
+export type ConfigUpdate = Partial<{
+  llm_provider: string;
+  llm_model: string;
+  search_provider: string;
+  require_plan_approval: boolean;
+}>;
+
+// ---------------------------------------------------------------------------
+// Runs
+// ---------------------------------------------------------------------------
+
+export type CreateRun = {
+  query: string;
+  template?: string; // default "deep_research"
+  require_plan_approval?: boolean; // default from config
+  config?: {
+    llm_provider?: string;
+    llm_model?: string;
+    search_provider?: string;
+  };
+};
+
+export type RunStatus =
+  | "queued"
+  | "planning"
+  | "awaiting_plan"
+  | "researching"
+  | "writing"
+  | "done"
+  | "error"
+  | string;
+
+export type RunSummary = {
+  run_id: string;
+  query: string;
+  template: string;
+  status: RunStatus;
+  created_at: string;
+  title?: string;
+};
+
+export type PlanSection = {
+  id: string;
+  title: string;
+  goal: string;
+  queries: string[];
+};
+
+export type Source = {
+  id: number;
+  title: string;
+  url: string;
+  snippet: string;
+  section_id?: string;
+};
+
+export type Plan = {
+  brief: string;
+  sections: PlanSection[];
+};
+
+export type RunDetail = {
+  run_id: string;
+  query: string;
+  template: string;
+  status: RunStatus;
+  title?: string;
+  created_at?: string;
+  plan?: Plan | null;
+  sections?: PlanSection[];
+  report?: string; // Markdown
+  sources?: Source[];
+};
+
+// ---------------------------------------------------------------------------
+// SSE events
+// ---------------------------------------------------------------------------
+
+export type EventType =
+  | "status"
+  | "plan"
+  | "awaiting_plan"
+  | "search"
+  | "source"
+  | "note"
+  | "section_start"
+  | "section_done"
+  | "report_delta"
+  | "report"
+  | "error"
+  | "done";
+
+export type ResearchEvent = {
+  seq: number;
+  run_id: string;
+  ts: number; // epoch ms
+  type: EventType;
+  data: unknown; // shape depends on type — narrowed below
+};
+
+// Per-type payload shapes (from the contract). Used to narrow `event.data`.
+export type StatusData = { stage: RunStatus; message: string };
+export type PlanData = { brief: string; sections: PlanSection[] };
+export type AwaitingPlanData = Record<string, never>;
+export type SearchData = { section_id: string; query: string };
+export type SourceData = { section_id: string; source: Source };
+export type NoteData = { section_id: string; content: string };
+export type SectionStartData = { section_id: string; title: string };
+export type SectionDoneData = {
+  section_id: string;
+  summary: string;
+  source_count: number;
+};
+export type ReportDeltaData = { text: string };
+export type ReportData = { markdown: string; title: string };
+export type ErrorData = { message: string };
+export type DoneData = { title: string; source_count: number };
