@@ -168,7 +168,8 @@ Full contract in `docs/API_CONTRACT.md`. Summary of groups:
   Google: `GET /api/auth/google/start`, `GET /api/auth/google/callback`.
 - **Runs** — `POST /api/runs`, `GET /api/runs`, `GET /api/runs/{id}`,
   `GET /api/runs/{id}/stream` (SSE), `POST /api/runs/{id}/plan`, `POST /api/runs/{id}/cancel`.
-- **Config/Templates** — `GET/POST /api/config`, `GET /api/templates`.
+- **Config/Templates** — `GET/POST /api/config`, `GET /api/templates`, `GET /api/about`
+  (authors, license, acknowledgements — powers the in-app credits page/footer).
 - **Admin** — `GET/POST/PATCH /api/admin/users`, `GET/POST/DELETE /api/admin/credentials`
   (+ `/revoke`, `/rotate`), `GET /api/admin/audit`.
 
@@ -181,9 +182,17 @@ Screens: **Setup** (first-run superadmin onboarding, Strapi-style; §6a) · **Lo
 (email + "Continue with Google") · **Home** (query + template + language) · **Run** (live
 timeline, plan-review card, streamed report with TOC + copy/download) · **History** ·
 **Settings** (providers/models/language/HITL toggle) · **Admin** (users, credentials
-add/revoke/expire/rotate, audit log). Nav is role-gated; setup mode overrides all routes.
+add/revoke/expire/rotate, audit log) · **About / Credits** (authors, license, third-party
+acknowledgements). Nav is role-gated; setup mode overrides all routes.
 Polished, editorial, premium look (frontend-design + shadcn), light/dark, excellent report
 typography. Talks to the backend via the typed client from the API contract.
+
+**In-app credits (required):** a persistent **footer** and an **About / Credits** page credit
+the authors — **Narenrit Hadsadintorn (captainkie)** and **Claude (Anthropic)** as AI
+pair-builder — show the **MIT license**, and link the four inspiration projects with their
+licenses (from `THIRD_PARTY_NOTICES.md`). Backend exposes `GET /api/about` returning
+`{ app, version, license: "MIT", authors: [...], acknowledgements: [...] }` so the page is
+data-driven and stays in sync.
 
 ## 10. Quality Gates & CI
 

@@ -41,6 +41,12 @@ plan, then watch the system search the web, read sources, and synthesize a detai
 Built in milestone PRs (see the design spec): engine core → API + DB → security/auth →
 frontend → admin panel → CI & docs.
 
+## Authors
+
+Built by **Narenrit Hadsadintorn** ([@captainkie](https://github.com/captainkie)) together
+with **Claude** (Anthropic) as an AI pair-builder. Both are credited in-app on the
+**About / Credits** page and in the site footer.
+
 ## Acknowledgements
 
 Inspired by [open_deep_research](https://github.com/langchain-ai/open_deep_research),
