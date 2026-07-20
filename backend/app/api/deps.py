@@ -14,12 +14,18 @@ from app.db.database import Database
 from app.services.config_service import ConfigService
 
 if TYPE_CHECKING:
+    from app.services.auth_service import AuthService
     from app.services.run_service import RunService
     from app.services.vault_service import VaultService
+    from app.settings import AppSettings
 
 
 def get_db(request: Request) -> Database:
     return request.app.state.db
+
+
+def get_app_settings(request: Request) -> "AppSettings":
+    return request.app.state.settings
 
 
 def get_config_service(request: Request) -> ConfigService:
@@ -32,3 +38,7 @@ def get_run_service(request: Request) -> "RunService":
 
 def get_vault_service(request: Request) -> "VaultService":
     return request.app.state.vault_service
+
+
+def get_auth_service(request: Request) -> "AuthService":
+    return request.app.state.auth_service

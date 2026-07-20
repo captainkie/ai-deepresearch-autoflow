@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends
 from app.api.deps import get_config_service
 from app.api.schemas_api import ConfigResponse, ConfigUpdate, TemplateOut, TemplatesResponse
 from app.prompts.templates import TEMPLATES
+from app.security.rbac import require_admin
 from app.services.config_service import ConfigService
 
 router = APIRouter(prefix="/api", tags=["config"])
@@ -27,7 +28,7 @@ async def get_config(svc: ConfigService = Depends(get_config_service)) -> Config
     return ConfigResponse(**await svc.current())
 
 
-@router.post("/config")
+@router.post("/config", dependencies=[Depends(require_admin)])
 async def update_config(
     patch: ConfigUpdate, svc: ConfigService = Depends(get_config_service)
 ) -> ConfigResponse:

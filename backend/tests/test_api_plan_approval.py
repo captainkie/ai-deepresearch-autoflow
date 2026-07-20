@@ -7,7 +7,7 @@ persists ``awaiting_plan`` to SQLite regardless, so we detect the pause by
 polling ``GET /runs/{id}`` and then POST ``/plan``; once the run finishes, the
 buffered stream delivers the full event history. Under real uvicorn (see the
 ``serve`` command) sse-starlette streams incrementally — this buffering is purely
-a test-client artifact.
+a test-auth_client artifact.
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ import json
 _MOCK_CONFIG = {"llm_provider": "mock", "search_provider": "mock", "crawl_provider": "mock"}
 
 
-async def _create_run(client):
-    resp = await client.post(
+async def _create_run(auth_client):
+    resp = await auth_client.post(
         "/api/runs",
         json={"query": "brand X", "config": _MOCK_CONFIG, "require_plan_approval": True},
     )
@@ -27,8 +27,8 @@ async def _create_run(client):
     return resp.json()["run_id"]
 
 
-async def _collect_stream(client, run_id, events):
-    async with client.stream("GET", f"/api/runs/{run_id}/stream") as resp:
+async def _collect_stream(auth_client, run_id, events):
+    async with auth_client.stream("GET", f"/api/runs/{run_id}/stream") as resp:
         assert resp.status_code == 200
         async for line in resp.aiter_lines():
             if not line.startswith("data:"):
@@ -41,23 +41,23 @@ async def _collect_stream(client, run_id, events):
                 break
 
 
-async def _wait_for_status(client, run_id, target, tries=250, delay=0.02):
+async def _wait_for_status(auth_client, run_id, target, tries=250, delay=0.02):
     for _ in range(tries):
-        detail = (await client.get(f"/api/runs/{run_id}")).json()
+        detail = (await auth_client.get(f"/api/runs/{run_id}")).json()
         if detail["status"] == target:
             return detail
         await asyncio.sleep(delay)
     raise AssertionError(f"run {run_id} never reached status {target!r}")
 
 
-async def test_awaiting_plan_then_approve_as_is(client):
-    run_id = await _create_run(client)
+async def test_awaiting_plan_then_approve_as_is(auth_client):
+    run_id = await _create_run(auth_client)
     events: list[dict] = []
-    reader = asyncio.create_task(_collect_stream(client, run_id, events))
+    reader = asyncio.create_task(_collect_stream(auth_client, run_id, events))
 
-    await _wait_for_status(client, run_id, "awaiting_plan")
+    await _wait_for_status(auth_client, run_id, "awaiting_plan")
 
-    resp = await client.post(f"/api/runs/{run_id}/plan", json={"approve": True})
+    resp = await auth_client.post(f"/api/runs/{run_id}/plan", json={"approve": True})
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
@@ -70,12 +70,12 @@ async def test_awaiting_plan_then_approve_as_is(client):
     assert len(starts) == 2
 
 
-async def test_awaiting_plan_then_edit_sections(client):
-    run_id = await _create_run(client)
+async def test_awaiting_plan_then_edit_sections(auth_client):
+    run_id = await _create_run(auth_client)
     events: list[dict] = []
-    reader = asyncio.create_task(_collect_stream(client, run_id, events))
+    reader = asyncio.create_task(_collect_stream(auth_client, run_id, events))
 
-    detail = await _wait_for_status(client, run_id, "awaiting_plan")
+    detail = await _wait_for_status(auth_client, run_id, "awaiting_plan")
     original = detail["plan"]["sections"]
     assert len(original) >= 1
     # Keep only the first section, with an edited title.
@@ -88,7 +88,7 @@ async def test_awaiting_plan_then_edit_sections(client):
         }
     ]
 
-    resp = await client.post(f"/api/runs/{run_id}/plan", json={"sections": edited})
+    resp = await auth_client.post(f"/api/runs/{run_id}/plan", json={"sections": edited})
     assert resp.status_code == 200
 
     await asyncio.wait_for(reader, timeout=5)
@@ -96,23 +96,23 @@ async def test_awaiting_plan_then_edit_sections(client):
     assert len(starts) == 1
     assert starts[0]["data"]["title"].startswith("EDITED")
 
-    final = (await client.get(f"/api/runs/{run_id}")).json()
+    final = (await auth_client.get(f"/api/runs/{run_id}")).json()
     assert final["status"] == "done"
     assert len(final["sections"]) == 1
     assert final["sections"][0]["title"].startswith("EDITED")
 
 
-async def test_plan_on_non_awaiting_run_conflicts(client):
+async def test_plan_on_non_awaiting_run_conflicts(auth_client):
     # Auto-run (no approval required) never enters awaiting_plan.
-    resp = await client.post(
+    resp = await auth_client.post(
         "/api/runs",
         json={"query": "auto", "config": _MOCK_CONFIG, "require_plan_approval": False},
     )
     run_id = resp.json()["run_id"]
-    resp = await client.post(f"/api/runs/{run_id}/plan", json={"approve": True})
+    resp = await auth_client.post(f"/api/runs/{run_id}/plan", json={"approve": True})
     assert resp.status_code == 409
 
 
-async def test_plan_unknown_run_404(client):
-    resp = await client.post("/api/runs/nope/plan", json={"approve": True})
+async def test_plan_unknown_run_404(auth_client):
+    resp = await auth_client.post("/api/runs/nope/plan", json={"approve": True})
     assert resp.status_code == 404

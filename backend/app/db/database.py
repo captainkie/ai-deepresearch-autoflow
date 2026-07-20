@@ -39,7 +39,20 @@ class Database:
         await self._conn.execute("PRAGMA foreign_keys = ON")
         schema = _SCHEMA_PATH.read_text(encoding="utf-8")
         await self._conn.executescript(schema)
+        await self._migrate()
         await self._conn.commit()
+
+    async def _migrate(self) -> None:
+        """Idempotent column additions for databases created before a column existed.
+
+        ``CREATE TABLE IF NOT EXISTS`` won't add a new column to an existing table,
+        so bring older DBs up to date here (SQLite has no ``ADD COLUMN IF NOT EXISTS``).
+        """
+        cursor = await self.connection.execute("PRAGMA table_info(runs)")
+        columns = {row["name"] for row in await cursor.fetchall()}
+        await cursor.close()
+        if "owner_id" not in columns:
+            await self.connection.execute("ALTER TABLE runs ADD COLUMN owner_id TEXT")
 
     async def execute(self, sql: str, params: Sequence[Any] = ()) -> None:
         await self.connection.execute(sql, params)

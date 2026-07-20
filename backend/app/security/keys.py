@@ -12,10 +12,12 @@ import base64
 import binascii
 import logging
 import os
+import secrets
 
 logger = logging.getLogger("autoflow.security")
 
 KEY_BYTES = 32  # AES-256
+JWT_SECRET_MIN_CHARS = 32
 
 
 class MasterKeyError(RuntimeError):
@@ -57,3 +59,20 @@ def resolve_master_key(raw: str | None, app_env: str) -> bytes:
         "Set AUTOFLOW_MASTER_KEY (see `autoflow gen-key`) for real use."
     )
     return os.urandom(KEY_BYTES)
+
+
+def resolve_jwt_secret(raw: str | None, app_env: str) -> str:
+    """Resolve the JWT signing secret (same prod/dev policy as the master key)."""
+    if raw:
+        if len(raw) < JWT_SECRET_MIN_CHARS:
+            raise MasterKeyError(
+                f"AUTOFLOW_JWT_SECRET must be at least {JWT_SECRET_MIN_CHARS} characters"
+            )
+        return raw
+    if app_env.lower() == "production":
+        raise MasterKeyError("AUTOFLOW_JWT_SECRET is required when APP_ENV=production")
+    logger.warning(
+        "AUTOFLOW_JWT_SECRET is not set — generating an EPHEMERAL signing secret. "
+        "All sessions are invalidated on restart. Set AUTOFLOW_JWT_SECRET for real use."
+    )
+    return secrets.token_urlsafe(48)

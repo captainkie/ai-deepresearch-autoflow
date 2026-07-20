@@ -16,13 +16,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.__about__ import APP_NAME, VERSION
 from app.api import admin as admin_router
+from app.api import auth as auth_router
 from app.api import config as config_router
 from app.api import health as health_router
 from app.api import runs as runs_router
+from app.api import setup as setup_router
 from app.db.database import Database
-from app.db.repositories import AuditRepo, CredentialRepo
+from app.db.repositories import AuditRepo, CredentialRepo, RefreshTokenRepo, UserRepo
 from app.security.crypto import Vault
-from app.security.keys import resolve_master_key
+from app.security.keys import resolve_jwt_secret, resolve_master_key
+from app.services.auth_service import AuthService
 from app.services.config_service import ConfigService
 from app.services.run_service import RunService
 from app.services.vault_service import VaultService
@@ -37,10 +40,16 @@ async def _startup(app: FastAPI, settings: AppSettings) -> None:
         audit=AuditRepo(db),
         vault=Vault(resolve_master_key(settings.master_key, settings.app_env)),
     )
+    auth_service = AuthService(
+        users=UserRepo(db),
+        refresh_tokens=RefreshTokenRepo(db),
+        jwt_secret=resolve_jwt_secret(settings.jwt_secret, settings.app_env),
+    )
     config_service = ConfigService(db, settings, vault=vault_service)
     app.state.settings = settings
     app.state.db = db
     app.state.vault_service = vault_service
+    app.state.auth_service = auth_service
     app.state.config_service = config_service
     app.state.run_service = RunService(db, config_service, settings, vault=vault_service)
 
@@ -70,6 +79,8 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     app.include_router(health_router.router)
+    app.include_router(setup_router.router)
+    app.include_router(auth_router.router)
     app.include_router(config_router.router)
     app.include_router(runs_router.router)
     app.include_router(admin_router.router)
