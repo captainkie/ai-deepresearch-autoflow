@@ -27,7 +27,7 @@ import httpx
 
 from app.api.schemas_api import CreateRun, PlanSubmit, RunConfigIn
 from app.core.engine import ResearchEngine
-from app.core.events import Sink
+from app.core.events import Sink, now_ms
 from app.db.database import Database
 from app.db.repositories import EventRepo, RunRepo
 from app.models.schemas import Event, EventType, PlanSection, RunConfig, RunStatus
@@ -55,6 +55,33 @@ def _row_to_event(run_id: str, row: Any) -> Event:
         type=row["type"],
         data=json.loads(row["data_json"]),
     )
+
+
+class LlmCallCap:
+    """Wrap an ``LLMProvider`` to bound total calls per run.
+
+    Guards against a runaway research loop burning tokens/quota: after
+    ``max_calls`` invocations of ``complete``/``stream`` the next call raises,
+    which the engine surfaces as an ``error`` event. Transparent otherwise.
+    """
+
+    def __init__(self, inner: Any, max_calls: int) -> None:
+        self._inner = inner
+        self._max = max_calls
+        self._count = 0
+
+    def _bump(self) -> None:
+        self._count += 1
+        if self._count > self._max:
+            raise RuntimeError(f"LLM call cap exceeded ({self._max})")
+
+    async def complete(self, *args: Any, **kwargs: Any) -> str:
+        self._bump()
+        return await self._inner.complete(*args, **kwargs)
+
+    def stream(self, *args: Any, **kwargs: Any):
+        self._bump()
+        return self._inner.stream(*args, **kwargs)
 
 
 @dataclass
@@ -202,7 +229,7 @@ class RunService:
             query, config = await self._resolve_run(run_id)
             if config.require_plan_approval:
                 hub.approval = asyncio.get_running_loop().create_future()
-            llm = get_llm_provider(config, get_key)
+            llm = LlmCallCap(get_llm_provider(config, get_key), config.max_llm_calls)
             search = get_search_provider(config, self._client, get_key)
             crawl = get_crawl_provider(config, self._client, get_key)
             hub.task = asyncio.create_task(
@@ -230,7 +257,12 @@ class RunService:
         sink = self._make_sink(run_id, hub)
         approval = self._make_approval(config, hub)
         try:
-            await engine.run(run_id, query, config, sink, approval)
+            async with asyncio.timeout(config.timeout_s):
+                await engine.run(run_id, query, config, sink, approval)
+        except TimeoutError:
+            # The engine was cancelled by the wallclock guard before it could
+            # emit its own error, so emit one here.
+            await self._emit_error(run_id, hub, f"run exceeded time limit of {config.timeout_s}s")
         except asyncio.CancelledError:
             raise
         except Exception:  # noqa: BLE001 - engine already emitted an `error` event
@@ -239,6 +271,20 @@ class RunService:
             hub.finished.set()
             for queue in list(hub.subscribers):
                 queue.put_nowait(None)
+
+    async def _emit_error(self, run_id: str, hub: RunHub, message: str) -> None:
+        """Persist + fan out an ``error`` event with the next monotonic seq."""
+        seq = await self._events.count_by_run(run_id)
+        event = Event(
+            seq=seq,
+            run_id=run_id,
+            ts=now_ms(),
+            type=EventType.error,
+            data={"message": message},
+        )
+        await self._persist(run_id, event)
+        for queue in list(hub.subscribers):
+            queue.put_nowait(event)
 
     def _make_sink(self, run_id: str, hub: RunHub) -> Sink:
         async def sink(event: Event) -> None:

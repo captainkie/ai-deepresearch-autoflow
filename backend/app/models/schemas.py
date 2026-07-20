@@ -105,3 +105,6 @@ class RunConfig(BaseModel):
     fetch_per_query: int = 3
     section_concurrency: int = 3
     fetch_concurrency: int = 6
+    # Runaway-run guards (enforced by the API layer in M2).
+    max_llm_calls: int = 60
+    timeout_s: int = 900

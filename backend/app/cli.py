@@ -122,6 +122,19 @@ async def _run_research(args: argparse.Namespace) -> int:
     return 0
 
 
+def _serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    uvicorn.run(
+        "app.main:create_app",
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+        factory=True,
+    )
+    return 0
+
+
 def _print_about() -> None:
     print(f"{APP_NAME} v{VERSION}")
     print(f"License: {LICENSE}")
@@ -151,6 +164,11 @@ def build_parser() -> argparse.ArgumentParser:
     approve.add_argument("--no-approve", dest="approve", action="store_false")
     research.add_argument("--json-events", action="store_true", help="Emit raw JSON event lines")
 
+    serve = sub.add_parser("serve", help="Run the HTTP API (uvicorn)")
+    serve.add_argument("--host", default="127.0.0.1", help="Bind host (default: 127.0.0.1)")
+    serve.add_argument("--port", type=int, default=8000, help="Bind port (default: 8000)")
+    serve.add_argument("--reload", action="store_true", help="Auto-reload on code changes (dev)")
+
     sub.add_parser("about", help="Show authors, license, and acknowledgements")
     return parser
 
@@ -160,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "about":
         _print_about()
         return 0
+    if args.command == "serve":
+        return _serve(args)
     if args.command == "research":
         return asyncio.run(_run_research(args))
     return 1
