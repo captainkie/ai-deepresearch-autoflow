@@ -21,7 +21,7 @@ _DEFAULT_LLM_PROVIDER = "mock"
 _DEFAULT_LLM_MODEL = "mock-1"
 _DEFAULT_SEARCH_PROVIDER = "mock"
 
-_KEYED_LLM = ("anthropic", "openai", "gemini")
+_KEYED_LLM = ("anthropic", "openai", "gemini", "zai", "moonshot")
 _KEYED_SEARCH = ("tavily", "serper", "exa")
 
 # Which settings keys ``update`` is allowed to write.

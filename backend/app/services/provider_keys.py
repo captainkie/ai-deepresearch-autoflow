@@ -13,6 +13,8 @@ _KEY_ENV: dict[str, str] = {
     "anthropic": "ANTHROPIC_API_KEY",
     "openai": "OPENAI_API_KEY",
     "gemini": "GEMINI_API_KEY",
+    "zai": "ZAI_API_KEY",  # Zhipu GLM via LiteLLM `zai/` prefix (e.g. zai/glm-4.6)
+    "moonshot": "MOONSHOT_API_KEY",  # Moonshot Kimi via LiteLLM `moonshot/` prefix
     "litellm": "LITELLM_API_KEY",
     "tavily": "TAVILY_API_KEY",
     "serper": "SERPER_API_KEY",
