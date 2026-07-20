@@ -19,5 +19,18 @@ CREATE TABLE IF NOT EXISTS events (
   data_json TEXT NOT NULL, ts INTEGER NOT NULL, PRIMARY KEY (run_id, seq)
 );
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value_json TEXT NOT NULL);
+-- Security (M3): encrypted provider credentials + audit trail.
+CREATE TABLE IF NOT EXISTS provider_credentials (
+  id TEXT PRIMARY KEY, provider TEXT NOT NULL, label TEXT NOT NULL,
+  ciphertext BLOB NOT NULL, nonce BLOB NOT NULL, key_version INTEGER NOT NULL,
+  masked_hint TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'active',
+  created_by TEXT, created_at TEXT NOT NULL, expires_at TEXT, last_used_at TEXT
+);
+CREATE TABLE IF NOT EXISTS audit_log (
+  id TEXT PRIMARY KEY, actor_id TEXT, action TEXT NOT NULL,
+  target_type TEXT, target_id TEXT, meta_json TEXT, created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_runs_created ON runs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, seq);
+CREATE INDEX IF NOT EXISTS idx_cred_provider ON provider_credentials(provider, status);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);

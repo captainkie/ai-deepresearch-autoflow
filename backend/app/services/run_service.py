@@ -17,10 +17,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import httpx
@@ -35,8 +35,13 @@ from app.providers.crawl.registry import get_crawl_provider
 from app.providers.llm.registry import get_llm_provider
 from app.providers.search.registry import get_search_provider
 from app.services.config_service import ConfigService
-from app.services.provider_keys import get_key
+from app.services.provider_keys import get_key as env_get_key
 from app.settings import AppSettings
+
+if TYPE_CHECKING:
+    from app.services.vault_service import VaultService
+
+GetKey = Callable[[str], str | None]
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +101,16 @@ class RunHub:
 
 class RunService:
     def __init__(
-        self, db: Database, config_service: ConfigService, app_settings: AppSettings
+        self,
+        db: Database,
+        config_service: ConfigService,
+        app_settings: AppSettings,
+        vault: "VaultService | None" = None,
     ) -> None:
         self._db = db
         self._config = config_service
         self._app = app_settings
+        self._vault = vault
         self._runs = RunRepo(db)
         self._events = EventRepo(db)
         self._hubs: dict[str, RunHub] = {}
@@ -229,13 +239,37 @@ class RunService:
             query, config = await self._resolve_run(run_id)
             if config.require_plan_approval:
                 hub.approval = asyncio.get_running_loop().create_future()
-            llm = LlmCallCap(get_llm_provider(config, get_key), config.max_llm_calls)
-            search = get_search_provider(config, self._client, get_key)
-            crawl = get_crawl_provider(config, self._client, get_key)
+            key_fn = await self._build_get_key(config)
+            llm = LlmCallCap(get_llm_provider(config, key_fn), config.max_llm_calls)
+            search = get_search_provider(config, self._client, key_fn)
+            crawl = get_crawl_provider(config, self._client, key_fn)
             hub.task = asyncio.create_task(
                 self._run(run_id, query, config, hub, llm, search, crawl)
             )
             return hub
+
+    async def _build_get_key(self, config: RunConfig) -> GetKey:
+        """A per-run key resolver: vault credential first, env var as fallback.
+
+        Vault lookups are async (DB), but the provider adapters call ``get_key``
+        synchronously mid-request — so we pre-resolve the providers this run uses
+        into a snapshot and close over it. Mock providers need no key.
+        """
+        resolved: dict[str, str] = {}
+        if self._vault is not None:
+            for provider in {
+                config.llm_provider,
+                config.search_provider,
+                config.crawl_provider,
+            }:
+                secret = await self._vault.resolve(provider)
+                if secret:
+                    resolved[provider] = secret
+
+        def get_key(provider: str) -> str | None:
+            return resolved.get(provider) or env_get_key(provider)
+
+        return get_key
 
     async def _resolve_run(self, run_id: str) -> tuple[str, RunConfig]:
         row = await self._runs.get(run_id)

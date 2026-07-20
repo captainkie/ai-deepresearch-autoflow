@@ -15,6 +15,7 @@ from app.services.config_service import ConfigService
 
 if TYPE_CHECKING:
     from app.services.run_service import RunService
+    from app.services.vault_service import VaultService
 
 
 def get_db(request: Request) -> Database:
@@ -27,3 +28,7 @@ def get_config_service(request: Request) -> ConfigService:
 
 def get_run_service(request: Request) -> "RunService":
     return request.app.state.run_service
+
+
+def get_vault_service(request: Request) -> "VaultService":
+    return request.app.state.vault_service

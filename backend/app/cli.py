@@ -170,6 +170,7 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--reload", action="store_true", help="Auto-reload on code changes (dev)")
 
     sub.add_parser("about", help="Show authors, license, and acknowledgements")
+    sub.add_parser("gen-key", help="Print a fresh base64 AUTOFLOW_MASTER_KEY (32 bytes)")
     return parser
 
 
@@ -182,6 +183,11 @@ def main(argv: list[str] | None = None) -> int:
         return _serve(args)
     if args.command == "research":
         return asyncio.run(_run_research(args))
+    if args.command == "gen-key":
+        from app.security.keys import generate_master_key
+
+        print(generate_master_key())
+        return 0
     return 1
 
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 
@@ -30,6 +30,12 @@ class AppSettings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     default_language: str = "en"
     default_require_plan_approval: bool = True
+
+    # --- security (M3) ---
+    # ``APP_ENV`` is intentionally un-prefixed (shared convention); the vault KEK
+    # comes from ``AUTOFLOW_MASTER_KEY`` (base64, 32 bytes) — required in prod.
+    app_env: str = Field(default="development", validation_alias="APP_ENV")
+    master_key: str | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod
