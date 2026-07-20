@@ -15,6 +15,7 @@ from app.services.config_service import ConfigService
 
 if TYPE_CHECKING:
     from app.services.auth_service import AuthService
+    from app.services.oauth_service import GoogleOAuthService
     from app.services.run_service import RunService
     from app.services.vault_service import VaultService
     from app.settings import AppSettings
@@ -42,3 +43,7 @@ def get_vault_service(request: Request) -> "VaultService":
 
 def get_auth_service(request: Request) -> "AuthService":
     return request.app.state.auth_service
+
+
+def get_oauth_service(request: Request) -> "GoogleOAuthService | None":
+    return request.app.state.oauth_service

@@ -85,10 +85,17 @@ response. The `Vault` object's `repr` is `Vault(key=***)`.
   - **superadmin** rotates the master key and manages admins. There is always ≥1 superadmin.
   - A **disabled** user is rejected on every authenticated route.
 
-## Roadmap (next M3 slice)
+## Google OAuth (M3c)
 
-- **M3c** — Google OAuth (Authorization Code + PKCE), link to a user by verified email;
-  OAuth never creates a superadmin.
+An optional additional sign-in, enabled when `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and
+`GOOGLE_REDIRECT_URI` are set (otherwise `/api/auth/google/*` returns `503`).
+
+- **Authorization Code + PKCE** (S256). `GET /api/auth/google/start` returns the consent URL and
+  binds the PKCE `code_verifier` + a random `state` to the browser in a short-lived httpOnly cookie.
+- `GET /api/auth/google/callback` validates `state` against that cookie, exchanges the code, fetches
+  userinfo, and **requires `email_verified`**. It then links to an existing user by verified email
+  (or creates a new **member**), sets the refresh cookie, and redirects to `AUTOFLOW_FRONTEND_URL`.
+- OAuth **never creates a superadmin** and never overwrites an existing user's role.
 
 ## Reporting a vulnerability
 

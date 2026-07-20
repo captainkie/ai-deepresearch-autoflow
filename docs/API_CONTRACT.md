@@ -170,6 +170,10 @@ type User = { id: string; email: string; name: string; role: string; disabled: b
   `POST /api/auth/login` `{ email, password }` → `200` (`401` on bad creds) ·
   `POST /api/auth/refresh` → `200` (rotates; `401` if missing/invalid) ·
   `POST /api/auth/logout` → `{ ok: true }` · `GET /api/auth/me` → `User` (needs Bearer).
+- **Google OAuth** (enabled only when configured, else `503`) — `GET /api/auth/google/start` →
+  `{ auth_url }` (+ sets a short-lived PKCE/state cookie); `GET /api/auth/google/callback?code&state`
+  validates state, requires a verified email, links/creates a `member`, sets the refresh cookie, and
+  `302`-redirects to `AUTOFLOW_FRONTEND_URL`.
 - **Admin users** — `GET /api/admin/users` → `{ users: User[] }` (admin+) ·
   `PATCH /api/admin/users/{id}` `{ role?, disabled? }` → `User` (admin manages members/viewers;
   only a **superadmin** may grant/modify `admin`+ or disable an admin).
