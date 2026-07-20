@@ -79,9 +79,9 @@ semaphores cap concurrent sections and concurrent page-fetches; `tenacity` backo
 provider/network errors; per-run (and optional cross-run) URL→content cache to avoid
 refetching; cancellation via `asyncio.Task` + a cancel flag.
 
-**Loop limits (config, defaults):** `max_sections=6`, `max_iters_per_section=3`,
-`results_per_query=6`, `section_concurrency=3`, `fetch_concurrency=6`, `max_llm_calls`/run
-guard, wallclock timeout per run.
+**Loop limits (config, defaults):** `max_sections=6`, `max_iters_per_section=2`,
+`results_per_query=6`, `section_concurrency=3`, `fetch_concurrency=6`. A `max_llm_calls`/run
+guard and a per-run wallclock timeout are added in M2 (when runs become long-lived over HTTP).
 
 ## 5. Providers (swappable)
 

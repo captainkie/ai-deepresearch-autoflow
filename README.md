@@ -10,6 +10,14 @@
   <i>🚧 Under active construction — see the <a href="./docs/superpowers/specs/2026-07-20-ai-deepresearch-autoflow-design.md">design spec</a>.</i>
 </p>
 
+<p align="center">
+  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg"></a>
+  <img alt="Python" src="https://img.shields.io/badge/python-3.11%20%7C%203.12-blue">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-black">
+  <a href="https://github.com/sponsors/captainkie"><img alt="Sponsor" src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4"></a>
+  <a href="https://buymeacoffee.com/captainkiez"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buymeacoffee&logoColor=black"></a>
+</p>
+
 ---
 
 ## What it does
@@ -54,6 +62,14 @@ Inspired by [open_deep_research](https://github.com/langchain-ai/open_deep_resea
 [DeepResearch](https://github.com/Alibaba-NLP/DeepResearch), and
 [autoresearch](https://github.com/karpathy/autoresearch).
 See [THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md) for credits and licenses.
+
+## Support
+
+If this project is useful to you, consider supporting its development 💛
+
+- ⭐ Star the repo
+- 💖 [GitHub Sponsors](https://github.com/sponsors/captainkie)
+- ☕ [Buy Me a Coffee](https://buymeacoffee.com/captainkiez)
 
 ## License
 
