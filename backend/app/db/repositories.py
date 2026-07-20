@@ -38,14 +38,15 @@ class RunRepo:
         status: str,
         created_at: str,
         updated_at: str,
+        owner_id: str | None = None,
     ) -> None:
         await self._db.execute(
             """
             INSERT INTO runs (
               id, query, template, language, require_plan_approval,
               llm_provider, llm_model, search_provider, crawl_provider,
-              status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+              status, owner_id, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 id,
@@ -58,6 +59,7 @@ class RunRepo:
                 search_provider,
                 crawl_provider,
                 status,
+                owner_id,
                 created_at,
                 updated_at,
             ),
@@ -66,8 +68,13 @@ class RunRepo:
     async def get(self, run_id: str) -> aiosqlite.Row | None:
         return await self._db.fetchone("SELECT * FROM runs WHERE id = ?", (run_id,))
 
-    async def list(self) -> list[aiosqlite.Row]:
-        return await self._db.fetchall("SELECT * FROM runs ORDER BY created_at DESC, id DESC")
+    async def list(self, owner_id: str | None = None) -> list[aiosqlite.Row]:
+        if owner_id is None:
+            return await self._db.fetchall("SELECT * FROM runs ORDER BY created_at DESC, id DESC")
+        return await self._db.fetchall(
+            "SELECT * FROM runs WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
+            (owner_id,),
+        )
 
     async def update_status(
         self, run_id: str, status: str, updated_at: str, error: str | None = None
@@ -334,4 +341,98 @@ class AuditRepo:
     async def list(self, limit: int = 200) -> list[aiosqlite.Row]:
         return await self._db.fetchall(
             "SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT ?", (limit,)
+        )
+
+
+class UserRepo:
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    async def create(
+        self,
+        *,
+        id: str,
+        email: str,
+        name: str,
+        password_hash: str | None,
+        google_sub: str | None,
+        role: str,
+        created_at: str,
+        disabled: bool = False,
+    ) -> None:
+        await self._db.execute(
+            """
+            INSERT INTO users (id, email, name, password_hash, google_sub, role, disabled, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (id, email, name, password_hash, google_sub, role, int(disabled), created_at),
+        )
+
+    async def get(self, user_id: str) -> aiosqlite.Row | None:
+        return await self._db.fetchone("SELECT * FROM users WHERE id = ?", (user_id,))
+
+    async def get_by_email(self, email: str) -> aiosqlite.Row | None:
+        return await self._db.fetchone("SELECT * FROM users WHERE email = ?", (email,))
+
+    async def get_by_google_sub(self, google_sub: str) -> aiosqlite.Row | None:
+        return await self._db.fetchone("SELECT * FROM users WHERE google_sub = ?", (google_sub,))
+
+    async def list(self) -> list[aiosqlite.Row]:
+        return await self._db.fetchall("SELECT * FROM users ORDER BY created_at ASC, id ASC")
+
+    async def set_role(self, user_id: str, role: str) -> None:
+        await self._db.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+
+    async def set_disabled(self, user_id: str, disabled: bool) -> None:
+        await self._db.execute(
+            "UPDATE users SET disabled = ? WHERE id = ?", (int(disabled), user_id)
+        )
+
+    async def set_google_sub(self, user_id: str, google_sub: str) -> None:
+        await self._db.execute(
+            "UPDATE users SET google_sub = ? WHERE id = ?", (google_sub, user_id)
+        )
+
+    async def count(self) -> int:
+        row = await self._db.fetchone("SELECT COUNT(*) AS n FROM users")
+        return int(row["n"]) if row is not None else 0
+
+
+class RefreshTokenRepo:
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    async def create(
+        self,
+        *,
+        id: str,
+        user_id: str,
+        token_hash: str,
+        expires_at: str,
+        user_agent: str | None,
+        created_at: str,
+    ) -> None:
+        await self._db.execute(
+            """
+            INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, revoked_at, user_agent, created_at)
+            VALUES (?, ?, ?, ?, NULL, ?, ?)
+            """,
+            (id, user_id, token_hash, expires_at, user_agent, created_at),
+        )
+
+    async def get_by_hash(self, token_hash: str) -> aiosqlite.Row | None:
+        return await self._db.fetchone(
+            "SELECT * FROM refresh_tokens WHERE token_hash = ?", (token_hash,)
+        )
+
+    async def revoke(self, token_id: str, revoked_at: str) -> None:
+        await self._db.execute(
+            "UPDATE refresh_tokens SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+            (revoked_at, token_id),
+        )
+
+    async def revoke_all_for_user(self, user_id: str, revoked_at: str) -> None:
+        await self._db.execute(
+            "UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
+            (revoked_at, user_id),
         )

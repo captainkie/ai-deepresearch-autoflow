@@ -119,7 +119,7 @@ class RunService:
 
     # --- Create / query ------------------------------------------------------
 
-    async def create(self, create: CreateRun) -> str:
+    async def create(self, create: CreateRun, owner_id: str | None = None) -> str:
         current = await self._config.current()
         cfg_in = create.config or RunConfigIn()
         # Demo default: providers fall back to the runtime config (mock in dev).
@@ -148,13 +148,18 @@ class RunService:
             status=RunStatus.queued.value,
             created_at=now,
             updated_at=now,
+            owner_id=owner_id,
         )
         return run_id
 
     async def exists(self, run_id: str) -> bool:
         return await self._runs.get(run_id) is not None
 
-    async def list_runs(self) -> list[dict[str, Any]]:
+    async def get_owner(self, run_id: str) -> str | None:
+        row = await self._runs.get(run_id)
+        return row["owner_id"] if row is not None else None
+
+    async def list_runs(self, owner_id: str | None = None) -> list[dict[str, Any]]:
         return [
             {
                 "run_id": r["id"],
@@ -164,7 +169,7 @@ class RunService:
                 "created_at": r["created_at"],
                 "title": r["title"],
             }
-            for r in await self._runs.list()
+            for r in await self._runs.list(owner_id)
         ]
 
     async def get_detail(self, run_id: str) -> dict[str, Any] | None:

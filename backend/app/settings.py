@@ -36,6 +36,7 @@ class AppSettings(BaseSettings):
     # comes from ``AUTOFLOW_MASTER_KEY`` (base64, 32 bytes) — required in prod.
     app_env: str = Field(default="development", validation_alias="APP_ENV")
     master_key: str | None = None
+    jwt_secret: str | None = None
 
     @field_validator("cors_origins", mode="before")
     @classmethod

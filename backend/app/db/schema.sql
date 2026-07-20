@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS runs (
   require_plan_approval INTEGER NOT NULL DEFAULT 0,
   llm_provider TEXT, llm_model TEXT, search_provider TEXT, crawl_provider TEXT,
   status TEXT NOT NULL, title TEXT, report_markdown TEXT, error TEXT,
+  owner_id TEXT,
   created_at TEXT NOT NULL, updated_at TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS sections (
@@ -30,7 +31,17 @@ CREATE TABLE IF NOT EXISTS audit_log (
   id TEXT PRIMARY KEY, actor_id TEXT, action TEXT NOT NULL,
   target_type TEXT, target_id TEXT, meta_json TEXT, created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS users (
+  id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
+  password_hash TEXT, google_sub TEXT UNIQUE, role TEXT NOT NULL,
+  disabled INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS refresh_tokens (
+  id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+  expires_at TEXT NOT NULL, revoked_at TEXT, user_agent TEXT, created_at TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_runs_created ON runs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, seq);
 CREATE INDEX IF NOT EXISTS idx_cred_provider ON provider_credentials(provider, status);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_refresh_user ON refresh_tokens(user_id);

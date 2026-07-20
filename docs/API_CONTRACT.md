@@ -151,4 +151,31 @@ type AuditEntry = {
 - `POST /api/admin/credentials/rotate` — body `{ new_master_key }` (base64, 32 bytes) →
   `{ ok: true, key_version }` (`400` on a bad key). Re-encrypts all credentials under the new KEK.
 - `GET /api/admin/audit?limit=` → `{ audit: AuditEntry[] }` (newest first)
+
+## Auth, setup & users (M3b)
+
+Sessions: login/register/refresh return `{ user: User, access_token: string }` in the body and set
+a rotating **refresh** token as an httpOnly cookie. Send the access token as `Authorization: Bearer
+<access_token>`; call `POST /api/auth/refresh` (uses the cookie) to get a new one. Roles:
+`viewer < member < admin < superadmin`.
+
+```ts
+type User = { id: string; email: string; name: string; role: string; disabled: boolean; created_at: string }
+```
+
+- **Setup** (first-run) — `GET /api/setup/status` → `{ needs_setup: boolean }`;
+  `POST /api/setup` — body `{ email, name, password }` → `201 { user, access_token }` (first user is
+  `superadmin`; `409` if any user already exists).
+- **Auth** — `POST /api/auth/register` `{ email, name, password }` → `201` (creates a `member`) ·
+  `POST /api/auth/login` `{ email, password }` → `200` (`401` on bad creds) ·
+  `POST /api/auth/refresh` → `200` (rotates; `401` if missing/invalid) ·
+  `POST /api/auth/logout` → `{ ok: true }` · `GET /api/auth/me` → `User` (needs Bearer).
+- **Admin users** — `GET /api/admin/users` → `{ users: User[] }` (admin+) ·
+  `PATCH /api/admin/users/{id}` `{ role?, disabled? }` → `User` (admin manages members/viewers;
+  only a **superadmin** may grant/modify `admin`+ or disable an admin).
+
+**Auth on existing routes:** run routes require a logged-in user (create/plan/cancel need `member+`;
+a member only sees/manages their own runs, others 404). `POST /api/config` and all `/api/admin/*`
+require `admin+`; master-key rotation requires `superadmin`. `GET /api/templates`, `GET /api/config`,
+`/api/health`, `/api/about`, `/api/setup/*`, and `/api/auth/*` are open.
 ```

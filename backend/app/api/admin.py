@@ -9,16 +9,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from app.api.deps import get_vault_service
+from app.api.deps import get_auth_service, get_vault_service
 from app.security.keys import MasterKeyError, decode_master_key
+from app.security.rbac import ROLE_RANK, get_current_user, require_admin, require_superadmin
+from app.services.auth_service import AuthService
 
 if TYPE_CHECKING:
     from app.services.vault_service import VaultService
 
-router = APIRouter(prefix="/api/admin", tags=["admin"])
+# Every admin route requires the `admin` role or above.
+router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
 class CredentialCreate(BaseModel):
@@ -55,7 +59,7 @@ async def create_credential(
     )
 
 
-@router.post("/credentials/rotate")
+@router.post("/credentials/rotate", dependencies=[Depends(require_superadmin)])
 async def rotate_master_key(
     body: RotateRequest,
     vault: "VaultService" = Depends(get_vault_service),
@@ -95,3 +99,45 @@ async def list_audit(
     vault: "VaultService" = Depends(get_vault_service),
 ) -> dict:
     return {"audit": await vault.list_audit(limit)}
+
+
+class UserUpdate(BaseModel):
+    role: str | None = None
+    disabled: bool | None = None
+
+
+@router.get("/users")
+async def list_users(auth: AuthService = Depends(get_auth_service)) -> dict:
+    return {"users": await auth.list_users()}
+
+
+@router.patch("/users/{user_id}")
+async def update_user(
+    user_id: str,
+    body: UserUpdate,
+    actor: aiosqlite.Row = Depends(get_current_user),
+    auth: AuthService = Depends(get_auth_service),
+) -> dict:
+    target = await auth.get_user(user_id)
+    if target is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "user not found")
+
+    is_super = ROLE_RANK.get(actor["role"], -1) >= ROLE_RANK["superadmin"]
+    target_is_admin = ROLE_RANK.get(target["role"], -1) >= ROLE_RANK["admin"]
+
+    if body.role is not None:
+        if body.role not in ROLE_RANK:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "unknown role")
+        # Only a superadmin may grant admin+ or re-role an existing admin+.
+        if (ROLE_RANK[body.role] >= ROLE_RANK["admin"] or target_is_admin) and not is_super:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "only a superadmin can manage admins")
+        await auth.set_role(user_id, body.role)
+
+    if body.disabled is not None:
+        if target_is_admin and not is_super:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "only a superadmin can disable an admin")
+        await auth.set_disabled(user_id, body.disabled)
+
+    updated = await auth.get_user(user_id)
+    assert updated is not None
+    return AuthService.public(updated)

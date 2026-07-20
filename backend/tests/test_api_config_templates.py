@@ -74,11 +74,11 @@ async def test_get_config_endpoint(client):
     assert "require_plan_approval" in body
 
 
-async def test_post_config_persists(client):
-    resp = await client.post("/api/config", json={"search_provider": "duckduckgo"})
+async def test_post_config_persists(auth_client):
+    resp = await auth_client.post("/api/config", json={"search_provider": "duckduckgo"})
     assert resp.status_code == 200
     assert resp.json()["search"]["provider"] == "duckduckgo"
 
     # Persisted across requests (same in-memory DB / app.state).
-    resp2 = await client.get("/api/config")
+    resp2 = await auth_client.get("/api/config")
     assert resp2.json()["search"]["provider"] == "duckduckgo"

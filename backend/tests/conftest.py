@@ -34,3 +34,19 @@ async def client(app_settings):
     async with httpx.AsyncClient(transport=transport, base_url="http://t") as http_client:
         yield http_client
     await _shutdown(app)
+
+
+@pytest.fixture
+async def auth_client(client):
+    """A ``client`` authenticated as the first superadmin (via first-run setup).
+
+    Superadmin passes every role check and owns the runs it creates, so it's the
+    simplest identity for tests that just need to be past the auth wall. The Bearer
+    token is set as a default header on the client.
+    """
+    resp = await client.post(
+        "/api/setup",
+        json={"email": "root@example.com", "name": "Root", "password": "supersecret1"},
+    )
+    client.headers["Authorization"] = f"Bearer {resp.json()['access_token']}"
+    return client

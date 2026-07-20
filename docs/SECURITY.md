@@ -66,12 +66,29 @@ response. The `Vault` object's `repr` is `Vault(key=***)`.
 - `APP_ENV=production` fail-fast on a missing master key.
 - (M6) CI runs **gitleaks** on every PR.
 
-## Roadmap (later M3 slices)
+## Authentication & RBAC (M3b)
 
-- **M3b** — Argon2id passwords, JWT access + rotating refresh cookies, RBAC
-  (`superadmin/admin/member/viewer`), Strapi-style first-run superadmin setup;
-  the admin credential/audit routes above become **admin-only**.
-- **M3c** — Google OAuth (Authorization Code + PKCE), link by verified email.
+- **Passwords**: Argon2id (`argon2-cffi`); a wrong password returns `False`, never raises.
+- **Sessions**: a short-lived (~15 min) **JWT access token** (HS256, signed with
+  `AUTOFLOW_JWT_SECRET` — ≥32 chars, prod fail-fast / dev ephemeral) is returned in the
+  login/register/refresh body and sent back as `Authorization: Bearer`. The **refresh token**
+  is a long opaque string stored only as a SHA-256 hash, delivered as an **httpOnly** cookie
+  (Secure in production, SameSite=Lax), and **rotated on every use** — a reused (already-rotated)
+  refresh token is rejected.
+- **First-run setup**: on an empty `users` table the app is in setup mode; `POST /api/setup`
+  creates the first **superadmin** and is guarded to run only when zero users exist (409 on replay),
+  so it can never be used to seize a running instance.
+- **RBAC** (`viewer < member < admin < superadmin`), resolved from the DB row on each request
+  (a promotion or disable takes effect immediately, even for a live token):
+  - **member+** create/manage their own runs; a non-owner gets 404 (existence hidden).
+  - **admin+** manage credentials, audit, provider config, and members/viewers.
+  - **superadmin** rotates the master key and manages admins. There is always ≥1 superadmin.
+  - A **disabled** user is rejected on every authenticated route.
+
+## Roadmap (next M3 slice)
+
+- **M3c** — Google OAuth (Authorization Code + PKCE), link to a user by verified email;
+  OAuth never creates a superadmin.
 
 ## Reporting a vulnerability
 
