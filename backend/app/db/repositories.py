@@ -204,3 +204,134 @@ class SettingsRepo:
     async def all(self) -> dict[str, Any]:
         rows = await self._db.fetchall("SELECT key, value_json FROM settings")
         return {row["key"]: json.loads(row["value_json"]) for row in rows}
+
+
+class CredentialRepo:
+    """Encrypted provider credentials. Stores only ciphertext + nonce + a masked
+    hint — never plaintext. Decryption happens in the vault service at call time."""
+
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    async def create(
+        self,
+        *,
+        id: str,
+        provider: str,
+        label: str,
+        ciphertext: bytes,
+        nonce: bytes,
+        key_version: int,
+        masked_hint: str,
+        created_by: str | None,
+        created_at: str,
+        expires_at: str | None = None,
+        status: str = "active",
+    ) -> None:
+        await self._db.execute(
+            """
+            INSERT INTO provider_credentials (
+              id, provider, label, ciphertext, nonce, key_version, masked_hint,
+              status, created_by, created_at, expires_at, last_used_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            """,
+            (
+                id,
+                provider,
+                label,
+                ciphertext,
+                nonce,
+                key_version,
+                masked_hint,
+                status,
+                created_by,
+                created_at,
+                expires_at,
+            ),
+        )
+
+    async def get(self, cred_id: str) -> aiosqlite.Row | None:
+        return await self._db.fetchone(
+            "SELECT * FROM provider_credentials WHERE id = ?", (cred_id,)
+        )
+
+    async def list(self, provider: str | None = None) -> list[aiosqlite.Row]:
+        if provider is None:
+            return await self._db.fetchall(
+                "SELECT * FROM provider_credentials ORDER BY created_at DESC, id DESC"
+            )
+        return await self._db.fetchall(
+            "SELECT * FROM provider_credentials WHERE provider = ? "
+            "ORDER BY created_at DESC, id DESC",
+            (provider,),
+        )
+
+    async def active_for_provider(self, provider: str) -> list[aiosqlite.Row]:
+        """Active credentials for a provider, newest first (expiry checked by caller)."""
+        return await self._db.fetchall(
+            "SELECT * FROM provider_credentials WHERE provider = ? AND status = 'active' "
+            "ORDER BY created_at DESC, id DESC",
+            (provider,),
+        )
+
+    async def all(self) -> list[aiosqlite.Row]:
+        return await self._db.fetchall("SELECT * FROM provider_credentials")
+
+    async def set_status(self, cred_id: str, status: str) -> None:
+        await self._db.execute(
+            "UPDATE provider_credentials SET status = ? WHERE id = ?", (status, cred_id)
+        )
+
+    async def set_last_used(self, cred_id: str, last_used_at: str) -> None:
+        await self._db.execute(
+            "UPDATE provider_credentials SET last_used_at = ? WHERE id = ?",
+            (last_used_at, cred_id),
+        )
+
+    async def update_ciphertext(
+        self, cred_id: str, *, ciphertext: bytes, nonce: bytes, key_version: int
+    ) -> None:
+        await self._db.execute(
+            "UPDATE provider_credentials SET ciphertext = ?, nonce = ?, key_version = ? "
+            "WHERE id = ?",
+            (ciphertext, nonce, key_version, cred_id),
+        )
+
+
+class AuditRepo:
+    """Append-only audit trail of security-relevant actions."""
+
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    async def append(
+        self,
+        *,
+        id: str,
+        actor_id: str | None,
+        action: str,
+        target_type: str | None,
+        target_id: str | None,
+        meta: dict[str, Any] | None,
+        created_at: str,
+    ) -> None:
+        await self._db.execute(
+            """
+            INSERT INTO audit_log (id, actor_id, action, target_type, target_id, meta_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                id,
+                actor_id,
+                action,
+                target_type,
+                target_id,
+                json.dumps(meta) if meta is not None else None,
+                created_at,
+            ),
+        )
+
+    async def list(self, limit: int = 200) -> list[aiosqlite.Row]:
+        return await self._db.fetchall(
+            "SELECT * FROM audit_log ORDER BY created_at DESC, id DESC LIMIT ?", (limit,)
+        )

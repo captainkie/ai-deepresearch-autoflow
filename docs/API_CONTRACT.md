@@ -120,4 +120,35 @@ status(writing) → report_delta* → report → done
 
 (Engine v2 adds the claim/verification/contradiction events; on older/`verification_level:off`
 runs they simply don't appear, and clients de-dupe by `seq` as before.)
+
+## Admin — credentials & audit (M3a)
+
+Encrypted provider API keys. Secrets are **write-only**: create accepts a plaintext
+secret; every read returns a `masked_hint` + metadata only, never the plaintext.
+Ships open in M3a; becomes **admin-only** in M3b.
+
+```ts
+type Credential = {
+  id: string; provider: string; label: string;
+  masked_hint: string;              // e.g. "sk-p…wxyz" — safe to display
+  status: "active" | "revoked";
+  key_version: number;
+  created_by: string | null; created_at: string;
+  expires_at: string | null; last_used_at: string | null;
+}
+type AuditEntry = {
+  id: string; actor_id: string | null;
+  action: "credential.create" | "credential.revoke" | "credential.use" | "credential.rotate";
+  target_type: string | null; target_id: string | null;
+  meta_json: string | null; created_at: string;
+}
+```
+
+- `GET /api/admin/credentials?provider=` → `{ credentials: Credential[] }` (newest first)
+- `POST /api/admin/credentials` — body `{ provider, label, secret, expires_at? }` → `201 Credential`
+- `POST /api/admin/credentials/{id}/revoke` → `{ ok: true }` (`404` if unknown)
+- `DELETE /api/admin/credentials/{id}` → `{ ok: true }` (soft-delete = revoke)
+- `POST /api/admin/credentials/rotate` — body `{ new_master_key }` (base64, 32 bytes) →
+  `{ ok: true, key_version }` (`400` on a bad key). Re-encrypts all credentials under the new KEK.
+- `GET /api/admin/audit?limit=` → `{ audit: AuditEntry[] }` (newest first)
 ```
