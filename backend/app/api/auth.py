@@ -11,17 +11,22 @@ from typing import TYPE_CHECKING
 
 import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.api.cookies import REFRESH_COOKIE, clear_refresh_cookie, set_refresh_cookie
-from app.api.deps import get_app_settings, get_auth_service
+from app.api.deps import get_app_settings, get_auth_service, get_oauth_service
 from app.security.rbac import get_current_user
 from app.services.auth_service import AuthService, EmailExistsError
+from app.services.oauth_service import GoogleOAuthService, OAuthError
 
 if TYPE_CHECKING:
     from app.settings import AppSettings
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+OAUTH_COOKIE = "autoflow_oauth"
+_OAUTH_COOKIE_PATH = "/api/auth/google"
 
 
 class RegisterRequest(BaseModel):
@@ -108,3 +113,57 @@ async def logout(
 @router.get("/me")
 async def me(user: aiosqlite.Row = Depends(get_current_user)) -> dict:
     return AuthService.public(user)
+
+
+@router.get("/google/start")
+async def google_start(
+    response: Response,
+    settings: "AppSettings" = Depends(get_app_settings),
+    oauth: GoogleOAuthService | None = Depends(get_oauth_service),
+) -> dict:
+    if oauth is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "google oauth is not configured")
+    url, state, verifier = oauth.start()
+    # Bind the PKCE verifier + CSRF state to this browser for the callback.
+    response.set_cookie(
+        OAUTH_COOKIE,
+        f"{state}:{verifier}",
+        max_age=600,
+        httponly=True,
+        secure=settings.app_env.lower() == "production",
+        samesite="lax",
+        path=_OAUTH_COOKIE_PATH,
+    )
+    return {"auth_url": url}
+
+
+@router.get("/google/callback")
+async def google_callback(
+    request: Request,
+    code: str,
+    state: str,
+    settings: "AppSettings" = Depends(get_app_settings),
+    auth: AuthService = Depends(get_auth_service),
+    oauth: GoogleOAuthService | None = Depends(get_oauth_service),
+) -> RedirectResponse:
+    if oauth is None:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, "google oauth is not configured")
+    stored = request.cookies.get(OAUTH_COOKIE)
+    if not stored or ":" not in stored:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "missing oauth state")
+    expected_state, verifier = stored.split(":", 1)
+    if state != expected_state:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "oauth state mismatch")
+    try:
+        profile = await oauth.complete(code, verifier)
+    except OAuthError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    user = await auth.link_or_create_google_user(
+        sub=profile["sub"], email=profile["email"], name=profile["name"]
+    )
+    _, refresh = await auth.issue_tokens(user)
+    # The browser lands here from Google; set the session cookie and bounce to the app.
+    redirect = RedirectResponse(url=settings.frontend_url, status_code=status.HTTP_302_FOUND)
+    set_refresh_cookie(redirect, refresh, settings)
+    redirect.delete_cookie(OAUTH_COOKIE, path=_OAUTH_COOKIE_PATH)
+    return redirect

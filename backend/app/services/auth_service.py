@@ -148,6 +148,34 @@ class AuthService:
     async def set_disabled(self, user_id: str, disabled: bool) -> None:
         await self._users.set_disabled(user_id, disabled)
 
+    # --- OAuth linking (M3c) ----------------------------------------------- #
+
+    async def link_or_create_google_user(self, *, sub: str, email: str, name: str) -> aiosqlite.Row:
+        """Find a user by Google ``sub``, else link by verified email, else create
+        a new ``member``. OAuth never creates a superadmin."""
+        existing = await self._users.get_by_google_sub(sub)
+        if existing is not None:
+            return existing
+        by_email = await self._users.get_by_email(email.strip().lower())
+        if by_email is not None:
+            await self._users.set_google_sub(by_email["id"], sub)
+            linked = await self._users.get(by_email["id"])
+            assert linked is not None
+            return linked
+        user_id = self._new_id()
+        await self._users.create(
+            id=user_id,
+            email=email.strip().lower(),
+            name=name,
+            password_hash=None,
+            google_sub=sub,
+            role="member",
+            created_at=self._now(),
+        )
+        created = await self._users.get(user_id)
+        assert created is not None
+        return created
+
     # --- helpers ------------------------------------------------------------ #
 
     @staticmethod

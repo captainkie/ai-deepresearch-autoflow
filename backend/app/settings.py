@@ -38,6 +38,12 @@ class AppSettings(BaseSettings):
     master_key: str | None = None
     jwt_secret: str | None = None
 
+    # --- Google OAuth (M3c) — conventional un-prefixed names ---
+    google_client_id: str | None = Field(default=None, validation_alias="GOOGLE_CLIENT_ID")
+    google_client_secret: str | None = Field(default=None, validation_alias="GOOGLE_CLIENT_SECRET")
+    google_redirect_uri: str | None = Field(default=None, validation_alias="GOOGLE_REDIRECT_URI")
+    frontend_url: str = "http://localhost:3000"
+
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _split_origins(cls, value: object) -> object:
