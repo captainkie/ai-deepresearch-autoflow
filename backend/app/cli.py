@@ -9,35 +9,36 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
 import sys
+
+import httpx
 
 from app.__about__ import ACKNOWLEDGEMENTS, APP_NAME, AUTHORS, LICENSE, VERSION
 from app.config import load_run_config
 from app.core.engine import ResearchEngine
-from app.models.schemas import Event, EventType, Plan, PlanSection, RunConfig
-from app.providers.crawl.mock import MockCrawlProvider
-from app.providers.llm.mock import MockLLMProvider
-from app.providers.search.mock import MockSearchProvider
+from app.models.schemas import Event, EventType, Plan, PlanSection
+from app.providers.crawl.registry import get_crawl_provider
+from app.providers.llm.registry import get_llm_provider
+from app.providers.search.registry import get_search_provider
 
 _CREDIT = f"{APP_NAME} v{VERSION} · {LICENSE} · by Narenrit (captainkie) & Claude"
 
+_KEY_ENV = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "litellm": "LITELLM_API_KEY",
+    "tavily": "TAVILY_API_KEY",
+    "serper": "SERPER_API_KEY",
+    "exa": "EXA_API_KEY",
+    "jina": "JINA_API_KEY",
+}
 
-def _build_providers(config: RunConfig):
-    if config.llm_provider != "mock":
-        raise SystemExit(f"llm provider '{config.llm_provider}' not available yet; use --llm mock")
-    if config.search_provider != "mock":
-        raise SystemExit(
-            f"search provider '{config.search_provider}' not available yet; use --search mock"
-        )
-    if config.crawl_provider != "mock":
-        raise SystemExit(
-            f"crawl provider '{config.crawl_provider}' not available yet; use --crawl mock"
-        )
-    return (
-        MockLLMProvider(model=config.llm_model),
-        MockSearchProvider(),
-        MockCrawlProvider(),
-    )
+
+def _env_get_key(provider: str) -> str | None:
+    env_name = _KEY_ENV.get(provider)
+    return os.environ.get(env_name) if env_name else None
 
 
 def _format_event(event: Event) -> str | None:
@@ -103,12 +104,16 @@ async def _run_research(args: argparse.Namespace) -> int:
         language=args.lang,
         require_plan_approval=args.approve,
     )
-    llm, search, crawl = _build_providers(config)
-    engine = ResearchEngine(llm=llm, search=search, crawl=crawl)
     sink = _make_sink(args.json_events)
     approval = _auto_approval if config.require_plan_approval else None
 
-    markdown = await engine.run("cli-run", args.query, config, sink, approval)
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        engine = ResearchEngine(
+            llm=get_llm_provider(config, _env_get_key),
+            search=get_search_provider(config, client, _env_get_key),
+            crawl=get_crawl_provider(config, client, _env_get_key),
+        )
+        markdown = await engine.run("cli-run", args.query, config, sink, approval)
 
     if not args.json_events:
         print(markdown)
