@@ -113,4 +113,13 @@ class ResearchEngine:
             async with section_sem:
                 await researcher.research(section)
 
-        await asyncio.gather(*(run_section(s) for s in sections))
+        # TaskGroup (not gather) so the first section failure cancels its
+        # siblings — otherwise orphaned section tasks keep emitting events onto
+        # the shared emitter after the `error` event and get destroyed at
+        # shutdown. Surface the original error (unwrapped) to run().
+        try:
+            async with asyncio.TaskGroup() as tg:
+                for section in sections:
+                    tg.create_task(run_section(section))
+        except* Exception as eg:
+            raise eg.exceptions[0] from None

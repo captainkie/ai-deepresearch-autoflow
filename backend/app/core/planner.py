@@ -62,4 +62,8 @@ class Planner:
             sid = section.id if section.id and section.id not in seen else f"s{i}"
             seen.add(sid)
             fixed.append(section.model_copy(update={"id": sid}))
+        if not fixed:
+            # A degenerate plan (no sections) must fail loudly, not silently
+            # produce an empty report.
+            raise ValueError("planner produced a plan with no sections")
         return plan.model_copy(update={"sections": fixed})

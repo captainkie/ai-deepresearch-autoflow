@@ -51,8 +51,11 @@ class Researcher:
         seen_queries: set[str] = set()
         queries = list(section.queries) or [section.title]
 
-        for _ in range(max(1, self._config.max_iters_per_section)):
+        max_iters = max(1, self._config.max_iters_per_section)
+        for i in range(max_iters):
             await self._run_queries(section, queries, seen_queries, notes)
+            if i == max_iters - 1:
+                break  # last allowed pass — a reflection here could only be discarded
             reflection = await self._reflect(section.goal, notes)
             if not reflection.get("need_more"):
                 break
@@ -110,7 +113,10 @@ class Researcher:
     async def _fetch_all(self, results: list[SearchResult]) -> list[PageContent]:
         async def fetch_one(result: SearchResult) -> PageContent:
             async with self._fetch_sem:
-                return await self._crawl.fetch(result.url)
+                try:
+                    return await self._crawl.fetch(result.url)
+                except Exception as exc:  # noqa: BLE001 - a bad page must not abort the batch
+                    return PageContent(url=result.url, ok=False, error=str(exc))
 
         return await asyncio.gather(*(fetch_one(r) for r in results))
 
