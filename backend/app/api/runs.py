@@ -10,6 +10,7 @@ from app.api.schemas_api import (
     CreateRun,
     CreateRunResponse,
     OkResponse,
+    PlanSubmit,
     RunDetail,
     RunsResponse,
     RunSummary,
@@ -52,6 +53,17 @@ async def stream_run(
             yield event.model_dump_json()
 
     return EventSourceResponse(event_source())
+
+
+@router.post("/runs/{run_id}/plan")
+async def submit_plan(
+    run_id: str, body: PlanSubmit, svc: RunService = Depends(get_run_service)
+) -> OkResponse:
+    if not await svc.exists(run_id):
+        raise HTTPException(status_code=404, detail="run not found")
+    if not await svc.submit_plan(run_id, body):
+        raise HTTPException(status_code=409, detail="run is not awaiting plan approval")
+    return OkResponse()
 
 
 @router.post("/runs/{run_id}/cancel")

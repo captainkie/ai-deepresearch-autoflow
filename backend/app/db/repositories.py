@@ -134,6 +134,9 @@ class RunRepo:
             "SELECT * FROM sections WHERE run_id = ? ORDER BY idx", (run_id,)
         )
 
+    async def delete_sections(self, run_id: str) -> None:
+        await self._db.execute("DELETE FROM sections WHERE run_id = ?", (run_id,))
+
     async def insert_source(
         self,
         run_id: str,

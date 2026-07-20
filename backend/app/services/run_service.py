@@ -25,12 +25,12 @@ from uuid import uuid4
 
 import httpx
 
-from app.api.schemas_api import CreateRun, RunConfigIn
+from app.api.schemas_api import CreateRun, PlanSubmit, RunConfigIn
 from app.core.engine import ResearchEngine
 from app.core.events import Sink
 from app.db.database import Database
 from app.db.repositories import EventRepo, RunRepo
-from app.models.schemas import Event, EventType, RunConfig, RunStatus
+from app.models.schemas import Event, EventType, PlanSection, RunConfig, RunStatus
 from app.providers.crawl.registry import get_crawl_provider
 from app.providers.llm.registry import get_llm_provider
 from app.providers.search.registry import get_search_provider
@@ -200,6 +200,8 @@ class RunService:
                 return hub
 
             query, config = await self._resolve_run(run_id)
+            if config.require_plan_approval:
+                hub.approval = asyncio.get_running_loop().create_future()
             llm = get_llm_provider(config, get_key)
             search = get_search_provider(config, self._client, get_key)
             crawl = get_crawl_provider(config, self._client, get_key)
@@ -247,8 +249,56 @@ class RunService:
         return sink
 
     def _make_approval(self, config: RunConfig, hub: RunHub):
-        # HITL plan approval is wired in Task 7; auto-run for now.
-        return None
+        if not config.require_plan_approval:
+            return None
+
+        async def approval(plan) -> list[PlanSection]:
+            # ``hub.approval`` is created eagerly in ``ensure_started`` so a POST
+            # /plan that arrives the instant ``awaiting_plan`` is seen still lands
+            # on a live future (no race with the engine reaching this await).
+            return await hub.approval
+
+        return approval
+
+    async def submit_plan(self, run_id: str, submit: PlanSubmit) -> bool:
+        """Resolve a paused run's plan future. Returns False if not awaiting."""
+        hub = self._hubs.get(run_id)
+        if hub is None or hub.approval is None or hub.approval.done():
+            return False
+        if submit.sections:
+            sections = [
+                PlanSection(id=s.id, title=s.title, goal=s.goal, queries=s.queries)
+                for s in submit.sections
+            ]
+            await self._replace_sections(run_id, sections)
+        else:
+            sections = await self._sections_from_db(run_id)
+        hub.approval.set_result(sections)
+        return True
+
+    async def _sections_from_db(self, run_id: str) -> list[PlanSection]:
+        return [
+            PlanSection(
+                id=row["id"],
+                title=row["title"] or "",
+                goal=row["goal"] or "",
+                queries=json.loads(row["queries_json"]) if row["queries_json"] else [],
+            )
+            for row in await self._runs.get_sections(run_id)
+        ]
+
+    async def _replace_sections(self, run_id: str, sections: list[PlanSection]) -> None:
+        await self._runs.delete_sections(run_id)
+        for idx, section in enumerate(sections):
+            await self._runs.upsert_section(
+                run_id,
+                id=section.id,
+                idx=idx,
+                title=section.title,
+                goal=section.goal,
+                queries=section.queries,
+                status="pending",
+            )
 
     async def _persist(self, run_id: str, event: Event) -> None:
         now = _now_iso()
