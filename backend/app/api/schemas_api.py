@@ -26,10 +26,16 @@ class AckOut(BaseModel):
     license: str
 
 
+class OrgOut(BaseModel):
+    name: str
+    url: str
+
+
 class AboutResponse(BaseModel):
     app: str
     version: str
     license: str
+    org: OrgOut
     authors: list[AuthorOut]
     acknowledgements: list[AckOut]
 

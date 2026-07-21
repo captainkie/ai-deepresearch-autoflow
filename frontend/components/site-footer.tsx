@@ -50,8 +50,17 @@ export function SiteFooter() {
         </div>
         <div className="flex flex-col gap-1 border-t border-border/50 pt-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>
-            Built by Narenrit Hadsadintorn &amp; Claude (Anthropic) ·{" "}
-            <span className="font-medium text-foreground">MIT</span> licensed
+            A product of{" "}
+            <a
+              href="https://fosivo.com"
+              target="_blank"
+              rel="noreferrer"
+              className="font-medium text-foreground transition-colors hover:text-primary"
+            >
+              Fosivo Labs Co., Ltd.
+            </a>{" "}
+            · Built by Narenrit Hadsadintorn &amp; Claude (Anthropic) ·{" "}
+            <span className="font-medium text-foreground">AGPL-3.0</span>
           </p>
           <p>Reports are AI-generated. Verify critical facts against the linked sources.</p>
         </div>

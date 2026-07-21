@@ -74,6 +74,7 @@ export type About = {
   app: string;
   version: string;
   license: string;
+  org: { name: string; url: string };
   authors: Author[];
   acknowledgements: Acknowledgement[];
 };
