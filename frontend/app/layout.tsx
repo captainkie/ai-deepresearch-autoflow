@@ -3,6 +3,8 @@ import { Hanken_Grotesk, Fraunces, Newsreader } from "next/font/google";
 import "./globals.css";
 
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/components/auth-provider";
+import { RouteGuard } from "@/components/route-guard";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -56,9 +58,13 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <TooltipProvider delayDuration={200}>
-            <SiteHeader />
-            <main className="flex-1">{children}</main>
-            <SiteFooter />
+            <AuthProvider>
+              <SiteHeader />
+              <main className="flex-1">
+                <RouteGuard>{children}</RouteGuard>
+              </main>
+              <SiteFooter />
+            </AuthProvider>
           </TooltipProvider>
           <Toaster position="bottom-right" />
         </ThemeProvider>

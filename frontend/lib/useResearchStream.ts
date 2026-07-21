@@ -18,6 +18,11 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { getRun, streamUrl, submitPlan, cancelRun } from "./api";
+import {
+  getAccessToken,
+  notifyUnauthenticated,
+  refreshAccessToken,
+} from "./auth";
 import type {
   DoneData,
   ErrorData,
@@ -400,11 +405,28 @@ export function useResearchStream(
       setConnection("connecting");
       setConnectionError(undefined);
       try {
-        const res = await fetch(streamUrl(runId), {
-          signal: controller.signal,
-          headers: { Accept: "text/event-stream" },
-          cache: "no-store",
-        });
+        const openWithAuth = () => {
+          const token = getAccessToken();
+          return fetch(streamUrl(runId), {
+            signal: controller.signal,
+            credentials: "include",
+            headers: {
+              Accept: "text/event-stream",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            cache: "no-store",
+          });
+        };
+        let res = await openWithAuth();
+        if (res.status === 401) {
+          // Access token expired mid-session — refresh once and reconnect.
+          if (await refreshAccessToken()) {
+            res = await openWithAuth();
+          } else {
+            notifyUnauthenticated();
+            throw new Error("Your session has expired. Please sign in again.");
+          }
+        }
         if (!res.ok || !res.body) {
           throw new Error(`Stream unavailable (${res.status})`);
         }

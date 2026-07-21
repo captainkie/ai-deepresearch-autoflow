@@ -17,6 +17,25 @@ export type Template = {
   audience: string;
 };
 
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+export type Role = "superadmin" | "admin" | "member" | "viewer";
+
+export type User = {
+  id: string;
+  email: string;
+  name: string;
+  role: Role;
+  disabled: boolean;
+  created_at: string;
+};
+
+export type SetupStatus = { needs_setup: boolean };
+
+export type Session = { user: User; access_token: string };
+
 export type ConfigResponse = {
   llm: { provider: string; model: string; available: string[] };
   search: { provider: string; available: string[] };
