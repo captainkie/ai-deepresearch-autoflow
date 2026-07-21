@@ -3,7 +3,7 @@ import type { Template } from "./types";
 /**
  * Fallback research templates.
  *
- * Used when `GET /api/templates` is unavailable (e.g. backend offline) so the
+ * Used when `GET /api/v1/templates` is unavailable (e.g. backend offline) so the
  * home screen always has something meaningful to show. Ids are chosen to match
  * the backend's expected template slugs; `deep_research` is the contract default.
  */

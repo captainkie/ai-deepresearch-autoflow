@@ -5,7 +5,7 @@
  * fully-typed research state (plan, sections with searches/sources/notes, the
  * accumulating report, status and errors).
  *
- * The stream endpoint is GET `/api/runs/{id}/stream`, but we consume it with
+ * The stream endpoint is GET `/api/v1/runs/{id}/stream`, but we consume it with
  * `fetch` + a `ReadableStream` reader (not `EventSource`) so we get full control
  * over headers, aborting, and reconnection. On reconnect the server replays
  * buffered events (each carries a monotonic `seq`), so we de-duplicate by `seq`

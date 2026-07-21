@@ -13,6 +13,7 @@ import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from app.api import API_V1
 from app.api.deps import get_auth_service, get_vault_service
 from app.security.keys import MasterKeyError, decode_master_key
 from app.security.rbac import ROLE_RANK, get_current_user, require_admin, require_superadmin
@@ -22,7 +23,7 @@ if TYPE_CHECKING:
     from app.services.vault_service import VaultService
 
 # Every admin route requires the `admin` role or above.
-router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix=f"{API_V1}/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 
 
 class CredentialCreate(BaseModel):

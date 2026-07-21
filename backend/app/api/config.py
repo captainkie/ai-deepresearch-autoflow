@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends
 
+from app.api import API_V1
 from app.api.deps import get_config_service
 from app.api.schemas_api import (
     ConfigResponse,
@@ -16,7 +17,7 @@ from app.prompts.templates import TEMPLATES
 from app.security.rbac import get_current_user, require_admin
 from app.services.config_service import ConfigService
 
-router = APIRouter(prefix="/api", tags=["config"])
+router = APIRouter(prefix=API_V1, tags=["config"])
 
 
 @router.get("/templates")

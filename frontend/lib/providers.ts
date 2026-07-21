@@ -3,7 +3,7 @@
  *
  * The backend accepts any LiteLLM model id, so the model lists here are curated
  * *suggestions* — the Model field always allows a custom value. `available`
- * (from GET /api/config) still governs which providers can actually be selected;
+ * (from GET /api/v1/config) still governs which providers can actually be selected;
  * these lists just make the full catalog visible with friendly names.
  */
 

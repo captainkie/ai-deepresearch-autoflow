@@ -45,7 +45,7 @@ type RequestOptions = RequestInit & { parseJson?: boolean };
 
 // Paths that manage auth themselves — never try to refresh-and-retry on their 401.
 function isAuthPath(path: string): boolean {
-  return path.startsWith("/api/auth/") || path.startsWith("/api/setup");
+  return path.startsWith("/api/v1/auth/") || path.startsWith("/api/v1/setup");
 }
 
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
@@ -95,12 +95,12 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
 // --- Health -------------------------------------------------------------
 export function getHealth() {
-  return request<{ status: string; version: string }>("/api/health");
+  return request<{ status: string; version: string }>("/api/v1/health");
 }
 
 // --- Auth & setup -------------------------------------------------------
 export function getSetupStatus(): Promise<SetupStatus> {
-  return request<SetupStatus>("/api/setup/status");
+  return request<SetupStatus>("/api/v1/setup/status");
 }
 
 export async function runSetup(body: {
@@ -108,7 +108,7 @@ export async function runSetup(body: {
   name: string;
   password: string;
 }): Promise<Session> {
-  const data = await request<Session>("/api/setup", {
+  const data = await request<Session>("/api/v1/setup", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -117,7 +117,7 @@ export async function runSetup(body: {
 }
 
 export async function login(email: string, password: string): Promise<Session> {
-  const data = await request<Session>("/api/auth/login", {
+  const data = await request<Session>("/api/v1/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   });
@@ -130,7 +130,7 @@ export async function register(body: {
   name: string;
   password: string;
 }): Promise<Session> {
-  const data = await request<Session>("/api/auth/register", {
+  const data = await request<Session>("/api/v1/auth/register", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -140,34 +140,34 @@ export async function register(body: {
 
 export async function logout(): Promise<void> {
   try {
-    await request<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
+    await request<{ ok: boolean }>("/api/v1/auth/logout", { method: "POST" });
   } finally {
     setAccessToken(null);
   }
 }
 
 export function getMe(): Promise<User> {
-  return request<User>("/api/auth/me");
+  return request<User>("/api/v1/auth/me");
 }
 
 export async function googleStartUrl(): Promise<string> {
-  const data = await request<{ auth_url: string }>("/api/auth/google/start");
+  const data = await request<{ auth_url: string }>("/api/v1/auth/google/start");
   return data.auth_url;
 }
 
 // --- Templates ----------------------------------------------------------
 export async function getTemplates(): Promise<Template[]> {
-  const data = await request<{ templates: Template[] }>("/api/templates");
+  const data = await request<{ templates: Template[] }>("/api/v1/templates");
   return data.templates ?? [];
 }
 
 // --- Config -------------------------------------------------------------
 export function getConfig(): Promise<ConfigResponse> {
-  return request<ConfigResponse>("/api/config");
+  return request<ConfigResponse>("/api/v1/config");
 }
 
 export function updateConfig(body: ConfigUpdate): Promise<ConfigResponse> {
-  return request<ConfigResponse>("/api/config", {
+  return request<ConfigResponse>("/api/v1/config", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -175,19 +175,19 @@ export function updateConfig(body: ConfigUpdate): Promise<ConfigResponse> {
 
 // --- Runs ---------------------------------------------------------------
 export function createRun(body: CreateRun): Promise<{ run_id: string }> {
-  return request<{ run_id: string }>("/api/runs", {
+  return request<{ run_id: string }>("/api/v1/runs", {
     method: "POST",
     body: JSON.stringify(body),
   });
 }
 
 export async function listRuns(): Promise<RunSummary[]> {
-  const data = await request<{ runs: RunSummary[] }>("/api/runs");
+  const data = await request<{ runs: RunSummary[] }>("/api/v1/runs");
   return data.runs ?? [];
 }
 
 export function getRun(runId: string): Promise<RunDetail> {
-  return request<RunDetail>(`/api/runs/${encodeURIComponent(runId)}`);
+  return request<RunDetail>(`/api/v1/runs/${encodeURIComponent(runId)}`);
 }
 
 export function submitPlan(
@@ -195,21 +195,21 @@ export function submitPlan(
   body: { sections: import("./types").PlanSection[] } | { approve: true },
 ): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(
-    `/api/runs/${encodeURIComponent(runId)}/plan`,
+    `/api/v1/runs/${encodeURIComponent(runId)}/plan`,
     { method: "POST", body: JSON.stringify(body) },
   );
 }
 
 export function cancelRun(runId: string): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(
-    `/api/runs/${encodeURIComponent(runId)}/cancel`,
+    `/api/v1/runs/${encodeURIComponent(runId)}/cancel`,
     { method: "POST" },
   );
 }
 
 // --- Admin: users -------------------------------------------------------
 export async function listUsers(): Promise<User[]> {
-  const data = await request<{ users: User[] }>("/api/admin/users");
+  const data = await request<{ users: User[] }>("/api/v1/admin/users");
   return data.users ?? [];
 }
 
@@ -217,7 +217,7 @@ export function updateUser(
   userId: string,
   body: { role?: Role; disabled?: boolean },
 ): Promise<User> {
-  return request<User>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+  return request<User>(`/api/v1/admin/users/${encodeURIComponent(userId)}`, {
     method: "PATCH",
     body: JSON.stringify(body),
   });
@@ -225,7 +225,7 @@ export function updateUser(
 
 // --- Admin: credentials -------------------------------------------------
 export async function listCredentials(): Promise<Credential[]> {
-  const data = await request<{ credentials: Credential[] }>("/api/admin/credentials");
+  const data = await request<{ credentials: Credential[] }>("/api/v1/admin/credentials");
   return data.credentials ?? [];
 }
 
@@ -235,7 +235,7 @@ export function createCredential(body: {
   secret: string;
   expires_at?: string | null;
 }): Promise<Credential> {
-  return request<Credential>("/api/admin/credentials", {
+  return request<Credential>("/api/v1/admin/credentials", {
     method: "POST",
     body: JSON.stringify(body),
   });
@@ -243,7 +243,7 @@ export function createCredential(body: {
 
 export function revokeCredential(id: string): Promise<{ ok: boolean }> {
   return request<{ ok: boolean }>(
-    `/api/admin/credentials/${encodeURIComponent(id)}/revoke`,
+    `/api/v1/admin/credentials/${encodeURIComponent(id)}/revoke`,
     { method: "POST" },
   );
 }
@@ -251,7 +251,7 @@ export function revokeCredential(id: string): Promise<{ ok: boolean }> {
 export function rotateMasterKey(
   newMasterKey: string,
 ): Promise<{ ok: boolean; key_version: number }> {
-  return request<{ ok: boolean; key_version: number }>("/api/admin/credentials/rotate", {
+  return request<{ ok: boolean; key_version: number }>("/api/v1/admin/credentials/rotate", {
     method: "POST",
     body: JSON.stringify({ new_master_key: newMasterKey }),
   });
@@ -259,16 +259,16 @@ export function rotateMasterKey(
 
 // --- Admin: audit -------------------------------------------------------
 export async function listAudit(limit = 100): Promise<AuditEntry[]> {
-  const data = await request<{ audit: AuditEntry[] }>(`/api/admin/audit?limit=${limit}`);
+  const data = await request<{ audit: AuditEntry[] }>(`/api/v1/admin/audit?limit=${limit}`);
   return data.audit ?? [];
 }
 
 // --- About --------------------------------------------------------------
 export function getAbout(): Promise<About> {
-  return request<About>("/api/about");
+  return request<About>("/api/v1/about");
 }
 
 // --- SSE ----------------------------------------------------------------
 export function streamUrl(runId: string): string {
-  return `${API_BASE}/api/runs/${encodeURIComponent(runId)}/stream`;
+  return `${API_BASE}/api/v1/runs/${encodeURIComponent(runId)}/stream`;
 }

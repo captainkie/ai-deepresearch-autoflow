@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
+from app.api import API_V1
 from app.api.cookies import set_refresh_cookie
 from app.api.deps import get_app_settings, get_auth_service, get_db
 from app.db.database import Database
@@ -23,7 +24,7 @@ from app.services.auth_service import AuthService
 if TYPE_CHECKING:
     from app.settings import AppSettings
 
-router = APIRouter(prefix="/api/setup", tags=["setup"])
+router = APIRouter(prefix=f"{API_V1}/setup", tags=["setup"])
 
 # Serialize first-run setup so two concurrent requests can't both pass the
 # "zero users" check and each create a superadmin (single-process app).

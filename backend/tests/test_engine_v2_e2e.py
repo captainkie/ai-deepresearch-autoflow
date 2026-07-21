@@ -32,7 +32,7 @@ async def app_client():
     transport = ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
         resp = await client.post(
-            "/api/setup",
+            "/api/v1/setup",
             json={"email": "root@example.com", "name": "Root", "password": "supersecret1"},
         )
         client.headers["Authorization"] = f"Bearer {resp.json()['access_token']}"
@@ -41,7 +41,7 @@ async def app_client():
 
 
 async def _drain(client, run_id: str, events: list[dict]) -> None:
-    async with client.stream("GET", f"/api/runs/{run_id}/stream") as resp:
+    async with client.stream("GET", f"/api/v1/runs/{run_id}/stream") as resp:
         assert resp.status_code == 200
         async for line in resp.aiter_lines():
             if line.startswith("data:"):
@@ -53,7 +53,7 @@ async def _drain(client, run_id: str, events: list[dict]) -> None:
 async def test_v2_run_emits_and_persists_claims(app_client):
     client, app = app_client
     resp = await client.post(
-        "/api/runs",
+        "/api/v1/runs",
         json={"query": "brand X", "config": _MOCK, "require_plan_approval": False},
     )
     run_id = resp.json()["run_id"]
@@ -80,7 +80,7 @@ async def test_v2_run_emits_and_persists_claims(app_client):
 async def test_entity_run_projects_comparison_and_confidence_summary(app_client):
     client, app = app_client
     resp = await client.post(
-        "/api/runs",
+        "/api/v1/runs",
         json={
             "query": "BrandX vs BrandY",
             "template": "competitor_brand",  # entity_mode
@@ -111,9 +111,9 @@ async def test_entity_run_projects_comparison_and_confidence_summary(app_client)
 
 async def test_verification_level_off_reproduces_legacy(app_client):
     client, app = app_client
-    await client.post("/api/config", json={"verification_level": "off"})
+    await client.post("/api/v1/config", json={"verification_level": "off"})
     resp = await client.post(
-        "/api/runs",
+        "/api/v1/runs",
         json={"query": "brand X", "config": _MOCK, "require_plan_approval": False},
     )
     run_id = resp.json()["run_id"]

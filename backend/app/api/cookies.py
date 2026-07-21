@@ -12,11 +12,13 @@ from typing import TYPE_CHECKING
 
 from fastapi import Response
 
+from app.api import API_V1
+
 if TYPE_CHECKING:
     from app.settings import AppSettings
 
 REFRESH_COOKIE = "autoflow_refresh"
-COOKIE_PATH = "/api/auth"
+COOKIE_PATH = f"{API_V1}/auth"
 _MAX_AGE_SECONDS = 30 * 24 * 3600  # matches the refresh token TTL
 
 

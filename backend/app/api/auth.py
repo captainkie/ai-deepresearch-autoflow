@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
+from app.api import API_V1
 from app.api.cookies import REFRESH_COOKIE, clear_refresh_cookie, set_refresh_cookie
 from app.api.deps import get_app_settings, get_auth_service, get_oauth_service
 from app.security.ratelimit import rate_limit
@@ -24,10 +25,10 @@ from app.services.oauth_service import GoogleOAuthService, OAuthError
 if TYPE_CHECKING:
     from app.settings import AppSettings
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix=f"{API_V1}/auth", tags=["auth"])
 
 OAUTH_COOKIE = "autoflow_oauth"
-_OAUTH_COOKIE_PATH = "/api/auth/google"
+_OAUTH_COOKIE_PATH = f"{API_V1}/auth/google"
 
 
 class RegisterRequest(BaseModel):
