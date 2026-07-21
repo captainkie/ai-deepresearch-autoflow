@@ -16,6 +16,11 @@
   <a href="https://buymeacoffee.com/captainkiez"><img alt="Buy Me a Coffee" src="https://img.shields.io/badge/Buy%20Me%20a%20Coffee-ffdd00?logo=buymeacoffee&logoColor=black"></a>
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/m7-05-report.png" width="880"
+       alt="AutoFlow report — a verification summary (high/medium/low confidence), a cited comparison table, the live research sidebar, and a table of contents">
+</p>
+
 ---
 
 ## What it does
@@ -45,6 +50,27 @@ contradictions** rather than asking you to trust a wall of text.
   roles; an admin panel to manage users and provider credentials.
 - 🌏 **i18n reports** — choose Thai or English output per job.
 - ✅ **Quality gates** — lint, type-check, tests, and secret-scanning in CI.
+
+---
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><b>Ask anything — pick a research template</b><br/><img src="docs/screenshots/m7-02-home.png" alt="Home composer with goal input and templates"></td>
+    <td width="50%"><b>Review &amp; edit the plan before it runs</b><br/><img src="docs/screenshots/m7-03-plan.png" alt="Editable research plan with sections and queries"></td>
+  </tr>
+  <tr>
+    <td><b>Confidence &amp; citations on every claim</b><br/><img src="docs/screenshots/m7-04-run-live.png" alt="Cited comparison table with per-claim confidence"></td>
+    <td><b>Research history for the whole team</b><br/><img src="docs/screenshots/m7-06-history.png" alt="Research history grid"></td>
+  </tr>
+  <tr>
+    <td><b>Members &amp; roles (RBAC)</b><br/><img src="docs/screenshots/m7-07-admin-users.png" alt="Admin users and roles table"></td>
+    <td><b>Encrypted provider-key vault</b><br/><img src="docs/screenshots/m7-08-admin-credentials.png" alt="Admin provider keys — write-only, revoke, rotate"></td>
+  </tr>
+</table>
+
+> Captured from the app running on **mock providers** (no keys, offline) — every view above is the real UI.
 
 ---
 

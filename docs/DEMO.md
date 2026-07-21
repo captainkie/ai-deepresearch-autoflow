@@ -140,8 +140,8 @@ so local dev and the hosted demo both work.
   instance cold-starts after idle, so the first request may take a few seconds.
 - **Resetting demo data:** the demo DB resets on redeploy (ephemeral disk), and a
   scheduled **GitHub Actions** job
-  ([`.github/workflows/demo-reset.yml`](../.github/workflows/demo-reset.yml), every
-  6 h) POSTs to the token-guarded `POST /api/v1/demo/reset`, which wipes all data
+  ([`.github/workflows/demo-reset.yml`](../.github/workflows/demo-reset.yml), weekly)
+  POSTs to the token-guarded `POST /api/v1/demo/reset`, which wipes all data
   and re-seeds the demo accounts. Set repo secret `DEMO_RESET_TOKEN` to match
   `AUTOFLOW_DEMO_RESET_TOKEN` on Render. `schedule` only fires on the **default
   branch**, so the cron activates once merged to `main` (run it by hand from the

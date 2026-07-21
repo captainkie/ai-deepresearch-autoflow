@@ -1,5 +1,6 @@
 "use client";
 
+import * as React from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -23,15 +24,23 @@ import { loginSchema, type LoginValues } from "@/lib/schemas";
 import { DEMO_ADMIN } from "@/lib/demo";
 import { useDemoMode } from "@/lib/use-demo-mode";
 
+// The hosted demo runs on a free tier that sleeps when idle; the first request
+// then cold-starts (tens of seconds). If a sign-in takes longer than this, we
+// surface a "waking the server" notice so the wait doesn't look like a bug.
+const WAKE_NOTICE_AFTER_MS = 3500;
+
 export default function LoginPage() {
   const { login } = useAuth();
   const demo = useDemoMode();
+  const [waking, setWaking] = React.useState(false);
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
   });
 
   async function onSubmit(values: LoginValues) {
+    setWaking(false);
+    const wakeTimer = setTimeout(() => setWaking(true), WAKE_NOTICE_AFTER_MS);
     try {
       await login(values.email, values.password);
       // AuthProvider redirects to "/" on success.
@@ -40,6 +49,9 @@ export default function LoginPage() {
         description:
           err instanceof Error ? err.message : "Check your email and password.",
       });
+    } finally {
+      clearTimeout(wakeTimer);
+      setWaking(false);
     }
   }
 
@@ -113,6 +125,19 @@ export default function LoginPage() {
           </Button>
         </form>
       </Form>
+
+      {/* Only when a request is slow (cold start), and never on a fast self-host
+          (demo === false) where a slow sign-in wouldn't be a sleeping server. */}
+      {waking && demo !== false ? (
+        <p
+          role="status"
+          className="mt-3 flex items-center justify-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-center text-xs text-muted-foreground ring-1 ring-inset ring-border"
+        >
+          <Loader2 className="size-3.5 shrink-0 animate-spin" />
+          Waking up the demo server — the free host sleeps when idle, so the first
+          sign-in can take up to a minute. Hang tight…
+        </p>
+      ) : null}
 
       <GoogleSignInButton />
 
