@@ -1,0 +1,25 @@
+# Demo overlay — turns the dev stack into a SAFE public demo.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+#
+# AUTOFLOW_DEMO_MODE makes the backend force mock providers on every run and
+# refuse credential entry / provider switching, so a shared demo can't run up
+# cost or capture a real API key. The frontend shows a "Live demo" banner.
+#
+# For a public URL (e.g. autoflow-research.fosivo.com) exposed via Cloudflare
+# Tunnel on a single origin, also override the two lines noted below and point
+# NEXT_PUBLIC_API_BASE at that origin (the tunnel routes /api → backend).
+services:
+  backend:
+    environment:
+      AUTOFLOW_DEMO_MODE: "true"
+      # For the tunnel demo, allow the public origin (same-origin also works):
+      # AUTOFLOW_CORS_ORIGINS: https://autoflow-research.fosivo.com
+      # AUTOFLOW_FRONTEND_URL: https://autoflow-research.fosivo.com
+
+  frontend:
+    environment:
+      # Local demo keeps localhost. For the tunnel, set this to the public origin
+      # so the browser calls the API on the same host (tunnel routes /api → :8000):
+      # NEXT_PUBLIC_API_BASE: https://autoflow-research.fosivo.com
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
