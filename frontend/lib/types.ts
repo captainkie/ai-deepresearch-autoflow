@@ -90,6 +90,8 @@ export type About = {
 export type ConfigResponse = {
   llm: { provider: string; model: string; available: string[] };
   search: { provider: string; available: string[] };
+  // Optional separate verifier model; empty ⇒ reuse the main language model.
+  verifier: { provider: string; model: string };
   require_plan_approval: boolean;
   verification_level?: VerificationLevel;
   demo_mode?: boolean;
@@ -99,6 +101,8 @@ export type ConfigUpdate = Partial<{
   llm_provider: string;
   llm_model: string;
   search_provider: string;
+  verifier_provider: string;
+  verifier_model: string;
   require_plan_approval: boolean;
   verification_level: VerificationLevel;
 }>;

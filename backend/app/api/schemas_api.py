@@ -61,9 +61,17 @@ class SearchConfig(BaseModel):
     available: list[str]
 
 
+class VerifierConfig(BaseModel):
+    # An optional separate (cheap/fast) model for claim verification.
+    # Empty ⇒ the verifier reuses the main language model.
+    provider: str = ""
+    model: str = ""
+
+
 class ConfigResponse(BaseModel):
     llm: LlmConfig
     search: SearchConfig
+    verifier: VerifierConfig = Field(default_factory=VerifierConfig)
     require_plan_approval: bool
     verification_level: str = "light"
     demo_mode: bool = False
@@ -73,6 +81,8 @@ class ConfigUpdate(BaseModel):
     llm_provider: str | None = None
     llm_model: str | None = None
     search_provider: str | None = None
+    verifier_provider: str | None = None
+    verifier_model: str | None = None
     require_plan_approval: bool | None = None
     verification_level: str | None = None
 
