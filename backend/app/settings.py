@@ -30,6 +30,8 @@ class AppSettings(BaseSettings):
     cors_origins: Annotated[list[str], NoDecode] = ["http://localhost:3000"]
     default_language: str = "en"
     default_require_plan_approval: bool = True
+    # In-process rate limiting on auth endpoints (disable in tests).
+    rate_limit_enabled: bool = True
 
     # --- security (M3) ---
     # ``APP_ENV`` is intentionally un-prefixed (shared convention); the vault KEK

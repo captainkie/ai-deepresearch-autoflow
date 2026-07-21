@@ -48,9 +48,7 @@ def extract_title(markdown: str) -> str:
     return match.group(1).strip() if match else ""
 
 
-def ensure_sources_section(
-    markdown: str, sources: list[Source], heading: str = "Sources"
-) -> str:
+def ensure_sources_section(markdown: str, sources: list[Source], heading: str = "Sources") -> str:
     """Ensure exactly one trailing sources list containing every source id.
 
     ``heading`` is the localized section title. The writer's own sources heading

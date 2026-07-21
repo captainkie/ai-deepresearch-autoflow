@@ -1,7 +1,7 @@
 """Admin endpoints: encrypted provider credentials + audit log.
 
-M3a ships these **open** (no auth) so the vault is usable end-to-end; M3b wraps
-them with RBAC (``admin`` and above). Every read returns a masked hint plus
+Every route requires the ``admin`` role or above, and each mutation is attributed
+to the acting admin in the audit log. Every read returns a masked hint plus
 metadata only — a credential's plaintext is never returned by any route.
 """
 
@@ -47,14 +47,14 @@ async def list_credentials(
 @router.post("/credentials", status_code=status.HTTP_201_CREATED)
 async def create_credential(
     body: CredentialCreate,
+    actor: aiosqlite.Row = Depends(get_current_user),
     vault: "VaultService" = Depends(get_vault_service),
 ) -> dict:
-    # actor_id is None until auth lands in M3b.
     return await vault.add_credential(
         provider=body.provider,
         label=body.label,
         plaintext=body.secret,
-        actor_id=None,
+        actor_id=actor["id"],
         expires_at=body.expires_at,
     )
 
@@ -62,22 +62,24 @@ async def create_credential(
 @router.post("/credentials/rotate", dependencies=[Depends(require_superadmin)])
 async def rotate_master_key(
     body: RotateRequest,
+    actor: aiosqlite.Row = Depends(get_current_user),
     vault: "VaultService" = Depends(get_vault_service),
 ) -> dict:
     try:
         new_key = decode_master_key(body.new_master_key)
     except MasterKeyError as exc:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
-    version = await vault.rotate_master_key(new_key, actor_id=None)
+    version = await vault.rotate_master_key(new_key, actor_id=actor["id"])
     return {"ok": True, "key_version": version}
 
 
 @router.post("/credentials/{cred_id}/revoke")
 async def revoke_credential(
     cred_id: str,
+    actor: aiosqlite.Row = Depends(get_current_user),
     vault: "VaultService" = Depends(get_vault_service),
 ) -> dict:
-    if not await vault.revoke(cred_id, actor_id=None):
+    if not await vault.revoke(cred_id, actor_id=actor["id"]):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "credential not found")
     return {"ok": True}
 
@@ -85,10 +87,11 @@ async def revoke_credential(
 @router.delete("/credentials/{cred_id}")
 async def delete_credential(
     cred_id: str,
+    actor: aiosqlite.Row = Depends(get_current_user),
     vault: "VaultService" = Depends(get_vault_service),
 ) -> dict:
     # Soft-delete = revoke: secrets are never hard-removed, so the audit trail holds.
-    if not await vault.revoke(cred_id, actor_id=None):
+    if not await vault.revoke(cred_id, actor_id=actor["id"]):
         raise HTTPException(status.HTTP_404_NOT_FOUND, "credential not found")
     return {"ok": True}
 
@@ -124,6 +127,7 @@ async def update_user(
 
     is_super = ROLE_RANK.get(actor["role"], -1) >= ROLE_RANK["superadmin"]
     target_is_admin = ROLE_RANK.get(target["role"], -1) >= ROLE_RANK["admin"]
+    target_is_active_super = target["role"] == "superadmin" and not target["disabled"]
 
     if body.role is not None:
         if body.role not in ROLE_RANK:
@@ -131,11 +135,21 @@ async def update_user(
         # Only a superadmin may grant admin+ or re-role an existing admin+.
         if (ROLE_RANK[body.role] >= ROLE_RANK["admin"] or target_is_admin) and not is_super:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "only a superadmin can manage admins")
+        # Never strip the last remaining superadmin — it would lock everyone out
+        # of superadmin-only functions (setup can't run once users exist).
+        if (
+            target_is_active_super
+            and ROLE_RANK[body.role] < ROLE_RANK["superadmin"]
+            and await auth.count_active_superadmins() <= 1
+        ):
+            raise HTTPException(status.HTTP_409_CONFLICT, "cannot demote the last superadmin")
         await auth.set_role(user_id, body.role)
 
     if body.disabled is not None:
         if target_is_admin and not is_super:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "only a superadmin can disable an admin")
+        if body.disabled and target_is_active_super and await auth.count_active_superadmins() <= 1:
+            raise HTTPException(status.HTTP_409_CONFLICT, "cannot disable the last superadmin")
         await auth.set_disabled(user_id, body.disabled)
 
     updated = await auth.get_user(user_id)

@@ -322,9 +322,7 @@ class RunService:
         """Persist + fan out an ``error`` event (wallclock-timeout path)."""
         await self._emit_out_of_band(run_id, hub, EventType.error, {"message": message})
 
-    async def _emit_status(
-        self, run_id: str, hub: RunHub | None, stage: str, message: str
-    ) -> None:
+    async def _emit_status(self, run_id: str, hub: RunHub | None, stage: str, message: str) -> None:
         """Persist + fan out a ``status`` event.
 
         Used to record a terminal ``cancelled`` state so a client that reconnects
@@ -351,9 +349,7 @@ class RunService:
             await self._persist(run_id, event)
             return
         async with hub.write_lock:
-            event = Event(
-                seq=hub.next_seq, run_id=run_id, ts=now_ms(), type=type_, data=data
-            )
+            event = Event(seq=hub.next_seq, run_id=run_id, ts=now_ms(), type=type_, data=data)
             hub.next_seq += 1
             await self._persist(run_id, event)
             for queue in list(hub.subscribers):

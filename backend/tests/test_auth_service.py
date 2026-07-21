@@ -57,7 +57,7 @@ async def test_issue_and_decode_access(db):
     assert len(refresh) > 40
 
 
-async def test_refresh_rotation_revokes_old(db):
+async def test_refresh_rotation_mints_working_token(db):
     auth = make_auth(db)
     await auth.register(email="u@x.com", name="U", password="secretpw", role="member")
     user = await auth.authenticate("u@x.com", "secretpw")
@@ -67,10 +67,25 @@ async def test_refresh_rotation_revokes_old(db):
     assert rotated is not None
     _, new_refresh, _ = rotated
     assert new_refresh != refresh
-    # The old refresh is now revoked — reuse is rejected.
-    assert await auth.rotate_refresh(refresh) is None
-    # The new one still works.
+    # The freshly rotated token works for the next rotation.
     assert await auth.rotate_refresh(new_refresh) is not None
+
+
+async def test_refresh_reuse_revokes_whole_family(db):
+    # Replaying an already-rotated (revoked) token is the signature of a stolen
+    # token: it is rejected AND kills every token for that user, so the thief's
+    # parallel chain and the victim's current token both die.
+    auth = make_auth(db)
+    await auth.register(email="u@x.com", name="U", password="secretpw", role="member")
+    user = await auth.authenticate("u@x.com", "secretpw")
+    _, refresh = await auth.issue_tokens(user)
+
+    rotated = await auth.rotate_refresh(refresh)
+    assert rotated is not None
+    _, new_refresh, _ = rotated
+
+    assert await auth.rotate_refresh(refresh) is None  # reuse detected
+    assert await auth.rotate_refresh(new_refresh) is None  # family revoked
 
 
 async def test_logout_revokes_refresh(db):
