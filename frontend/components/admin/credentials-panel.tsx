@@ -3,6 +3,8 @@
 import * as React from "react";
 import { toast } from "sonner";
 import { KeyRound, Plus, RefreshCw } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import {
   createCredential,
@@ -11,10 +13,18 @@ import {
   rotateMasterKey,
 } from "@/lib/api";
 import type { Credential } from "@/lib/types";
+import { credentialSchema, type CredentialValues } from "@/lib/schemas";
 import { providerLabel } from "@/lib/providers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { PanelLoading, StatusPill, Td, Th } from "./primitives";
 
 const PROVIDERS = [
@@ -39,13 +49,13 @@ function generateMasterKey(): string {
 
 export function CredentialsPanel() {
   const [creds, setCreds] = React.useState<Credential[] | null>(null);
-  const [provider, setProvider] = React.useState(PROVIDERS[0]);
-  const [label, setLabel] = React.useState("");
-  const [secret, setSecret] = React.useState("");
-  const [expiresOn, setExpiresOn] = React.useState("");
-  const [adding, setAdding] = React.useState(false);
   const [pendingKey, setPendingKey] = React.useState<string | null>(null);
   const [rotating, setRotating] = React.useState(false);
+
+  const form = useForm<CredentialValues>({
+    resolver: zodResolver(credentialSchema),
+    defaultValues: { provider: PROVIDERS[0], label: "", secret: "", expiresOn: "" },
+  });
 
   const load = React.useCallback(async () => {
     try {
@@ -62,36 +72,29 @@ export function CredentialsPanel() {
     void load();
   }, [load]);
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
-    if (!secret.trim() || adding) return;
-    setAdding(true);
+  const onAdd = form.handleSubmit(async (values) => {
     try {
       // A <input type="date"> yields "YYYY-MM-DD". Treat it as end-of-day in the
       // admin's *local* time (so the date shown back matches what they picked),
       // then serialize to an aware UTC ISO string the backend can compare safely.
-      const expires_at = expiresOn
-        ? new Date(`${expiresOn}T23:59:59`).toISOString()
+      const expires_at = values.expiresOn
+        ? new Date(`${values.expiresOn}T23:59:59`).toISOString()
         : null;
       await createCredential({
-        provider,
-        label: label.trim() || provider,
-        secret,
+        provider: values.provider,
+        label: values.label?.trim() || values.provider,
+        secret: values.secret,
         expires_at,
       });
-      setSecret("");
-      setLabel("");
-      setExpiresOn("");
+      form.reset({ provider: values.provider, label: "", secret: "", expiresOn: "" });
       toast.success("Credential added");
       await load();
     } catch (err) {
       toast.error("Couldn't add credential", {
         description: err instanceof Error ? err.message : undefined,
       });
-    } finally {
-      setAdding(false);
     }
-  }
+  });
 
   async function revoke(id: string) {
     try {
@@ -126,70 +129,100 @@ export function CredentialsPanel() {
 
   return (
     <div className="space-y-6">
-      <form onSubmit={add} className="rounded-xl border border-border/70 bg-card/40 p-4">
-        <p className="mb-3 flex items-center gap-1.5 text-sm font-medium">
-          <Plus className="size-4 text-primary" /> Add a provider key
-        </p>
-        <div className="grid gap-3 sm:grid-cols-[8rem_9rem_minmax(0,1fr)_9.5rem_auto] sm:items-end">
-          <div className="space-y-1">
-            <Label htmlFor="cred-provider" className="text-xs">
-              Provider
-            </Label>
-            <select
-              id="cred-provider"
-              value={provider}
-              onChange={(e) => setProvider(e.target.value)}
-              className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
-            >
-              {PROVIDERS.map((p) => (
-                <option key={p} value={p}>
-                  {providerLabel(p)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="cred-label" className="text-xs">
-              Label
-            </Label>
-            <Input
-              id="cred-label"
-              placeholder="e.g. prod"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
+      <Form {...form}>
+        <form
+          onSubmit={onAdd}
+          noValidate
+          className="rounded-xl border border-border/70 bg-card/40 p-4"
+        >
+          <p className="mb-3 flex items-center gap-1.5 text-sm font-medium">
+            <Plus className="size-4 text-primary" /> Add a provider key
+          </p>
+          <div className="grid gap-3 sm:grid-cols-[8rem_9rem_minmax(0,1fr)_9.5rem_auto] sm:items-start">
+            <FormField
+              control={form.control}
+              name="provider"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">Provider</FormLabel>
+                  <FormControl>
+                    <select
+                      {...field}
+                      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                    >
+                      {PROVIDERS.map((p) => (
+                        <option key={p} value={p}>
+                          {providerLabel(p)}
+                        </option>
+                      ))}
+                    </select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="cred-secret" className="text-xs">
-              Secret
-            </Label>
-            <Input
-              id="cred-secret"
-              type="password"
-              placeholder="sk-…"
-              autoComplete="off"
-              required
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
+            <FormField
+              control={form.control}
+              name="label"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">Label</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. prod" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="cred-expires" className="text-xs">
-              Expires <span className="text-muted-foreground">(optional)</span>
-            </Label>
-            <Input
-              id="cred-expires"
-              type="date"
-              value={expiresOn}
-              onChange={(e) => setExpiresOn(e.target.value)}
-              className="h-8"
+            <FormField
+              control={form.control}
+              name="secret"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">Secret</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="password"
+                      placeholder="sk-…"
+                      autoComplete="off"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
+            <FormField
+              control={form.control}
+              name="expiresOn"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-xs">
+                    Expires{" "}
+                    <span className="text-muted-foreground">(optional)</span>
+                  </FormLabel>
+                  <FormControl>
+                    <Input type="date" className="h-8" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <div className="flex flex-col gap-1.5">
+              <span className="hidden text-xs sm:block" aria-hidden>
+                &nbsp;
+              </span>
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="h-8"
+              >
+                Add
+              </Button>
+            </div>
           </div>
-          <Button type="submit" disabled={adding || !secret.trim()} className="h-8">
-            Add
-          </Button>
-        </div>
-      </form>
+        </form>
+      </Form>
 
       <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.05] p-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
