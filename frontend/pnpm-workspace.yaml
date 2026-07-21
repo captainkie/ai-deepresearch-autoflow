@@ -1,3 +1,7 @@
+overrides:
+  # Force the patched PostCSS (CVE: XSS via unescaped </style> in CSS stringify;
+  # a transitive 8.4.31 lingered alongside a fine 8.5.x).
+  postcss: ">=8.5.10"
 minimumReleaseAgeExclude:
   - radix-ui@1.6.4
 onlyBuiltDependencies:
