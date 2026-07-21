@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
+import { GoogleIcon } from "@/components/icons/google";
 import { useAuth } from "@/components/auth-provider";
 import { googleStartUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -91,7 +92,13 @@ export default function LoginPage() {
         <span className="h-px flex-1 bg-border" />
       </div>
 
-      <Button type="button" variant="outline" onClick={onGoogle} className="h-10 w-full">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={onGoogle}
+        className="h-10 w-full gap-2"
+      >
+        <GoogleIcon className="size-4" />
         Continue with Google
       </Button>
     </AuthShell>
