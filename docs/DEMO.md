@@ -82,18 +82,32 @@ ingress:
   - service: http_status:404
 ```
 
-**3d.** Point the app at the public origin — in `docker-compose.demo.yml`,
-uncomment the tunnel lines so:
-
-- backend: `AUTOFLOW_CORS_ORIGINS` + `AUTOFLOW_FRONTEND_URL` = `https://autoflow-research.fosivo.com`
-- frontend: `NEXT_PUBLIC_API_BASE` = `https://autoflow-research.fosivo.com`
-
-Then restart the demo stack and run the tunnel:
+**3d.** Serve it. The dev containers are great locally, but `next dev`'s HMR
+websocket can't tunnel and the demo needs a production frontend. Run the
+**backend (demo mode) in Docker** and the **frontend as a host production build**
+(single origin via the tunnel → no CORS, isolated `demo.db`):
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
-cloudflared tunnel run autoflow-demo      # → https://autoflow-research.fosivo.com is live
+# backend only, in demo mode (mock-forced, key entry locked, its own demo.db)
+docker compose -f docker-compose.yml -f docker-compose.demo.yml \
+               -f docker-compose.tunnel.yml up -d backend
+
+# frontend: production build pinned to the public origin (inlined at build time)
+cd frontend
+NEXT_PUBLIC_API_BASE=https://autoflow-research.fosivo.com pnpm exec next build
+NEXT_PUBLIC_API_BASE=https://autoflow-research.fosivo.com pnpm exec next start -p 3000 &
+
+# the tunnel (routes /api → :8000, everything else → :3000)
+cd ..
+cloudflared tunnel --config cloudflared/config.yml run autoflow-demo
+# → https://autoflow-research.fosivo.com is live
 ```
+
+> Known issue: a production build **inside** the frontend container currently
+> fails prerendering `/_global-error` ("two Reacts" — duplicate React from the
+> container's node_modules), so we build on the host for now. The host build is
+> clean. Fixing the container build (e.g. a proper standalone prod image) would
+> let the whole demo run in Docker.
 
 **3e.** Add the production redirect URI to your Google OAuth client:
 `https://autoflow-research.fosivo.com/api/v1/auth/google/callback`, and set

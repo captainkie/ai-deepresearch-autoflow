@@ -42,3 +42,6 @@ Thumbs.db
 
 # browser automation artifacts
 .playwright-mcp/
+
+# Cloudflare Tunnel local config (machine-specific creds path)
+cloudflared/config.yml

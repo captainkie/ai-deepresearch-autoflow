@@ -13,6 +13,9 @@ services:
   backend:
     environment:
       AUTOFLOW_DEMO_MODE: "true"
+      # Isolate the demo behind its own DB so a public demo never exposes the
+      # developer's real accounts / run history (the base stack uses m4demo.db).
+      AUTOFLOW_DB_PATH: /data/demo.db
       # For the tunnel demo, allow the public origin (same-origin also works):
       # AUTOFLOW_CORS_ORIGINS: https://autoflow-research.fosivo.com
       # AUTOFLOW_FRONTEND_URL: https://autoflow-research.fosivo.com
