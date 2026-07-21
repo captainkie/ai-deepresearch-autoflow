@@ -1,5 +1,5 @@
 # Render Blueprint — the public demo BACKEND (FastAPI, demo mode).
-# The frontend is hosted separately on Cloudflare Pages (see docs/DEPLOY.md).
+# The frontend is hosted separately on Vercel (see docs/DEMO.md).
 #
 # Deploy: Render dashboard → New → Blueprint → pick this repo, or
 #   render blueprint launch   (Render CLI). Set the sync:false secrets after.

@@ -2,7 +2,12 @@
 
 This covers three things: turning the stack into a **safe demo**, testing
 **"Continue with Google"**, and putting the demo on a public URL
-(`autoflow-research.fosivo.com`) via **Cloudflare Tunnel**.
+(`autoflow-research.fosivo.com`). The live demo runs **permanently** on
+**Vercel** (frontend) + **Render** (backend); a local **Cloudflare Tunnel** is
+kept as a throwaway alternative for testing from your own machine.
+
+> **Live:** frontend `https://autoflow-research.fosivo.com` (Vercel) · API
+> `https://api.autoflow-research.fosivo.com` (Render, demo mode).
 
 ---
 
@@ -53,23 +58,62 @@ sign-in without deploying anything.
 
 ---
 
-## 3. Public demo at `autoflow-research.fosivo.com` (Cloudflare Tunnel)
+## 3. Public demo at `autoflow-research.fosivo.com`
 
-One tunnel serves **both** the frontend and the API on a single origin
-(`/api/*` → backend, everything else → frontend), so there's no CORS to manage.
+Two split origins (frontend + API) rather than one, chosen so the refresh
+cookie stays `SameSite=Lax`: the API lives at `api.autoflow-research.fosivo.com`,
+a **subdomain of the frontend's** `autoflow-research.fosivo.com`, so they share
+the `fosivo.com` registrable domain and count as **same-site**. The backend
+whitelists the frontend origin in `AUTOFLOW_CORS_ORIGINS`, so cross-origin
+`fetch` works with credentials.
 
-**Prereqs:** `cloudflared` installed (✓), `fosivo.com` on Cloudflare.
+### Option A — permanent hosted demo (Vercel + Render) — **live**
+
+No machine of yours has to stay up.
+
+**Backend → Render** (Docker, free plan, Singapore) via [`render.yaml`](../render.yaml):
+
+1. Render dashboard → **New → Blueprint** → pick this repo → it reads
+   `render.yaml` (service `autoflow-demo-api`, demo mode, `/api/v1/health`
+   health check).
+2. Set the `sync:false` secrets in the dashboard: `AUTOFLOW_DEMO_ADMIN_PASSWORD`
+   (seeds the demo superadmin each boot), `GOOGLE_CLIENT_ID`,
+   `GOOGLE_CLIENT_SECRET`.
+3. Add the custom domain `api.autoflow-research.fosivo.com` (Render → Settings →
+   Custom Domains); create the matching `CNAME → <svc>.onrender.com` in
+   Cloudflare **DNS-only** (grey cloud) so Render can issue the cert.
+
+**Frontend → Vercel** (Next.js production build):
 
 ```bash
-# 3a. One-time: authorize cloudflared for the fosivo.com zone (opens a browser)
-cloudflared tunnel login
+cd frontend
+vercel deploy --prod --yes --scope <team> \
+  --build-env NEXT_PUBLIC_API_BASE=https://api.autoflow-research.fosivo.com \
+  --env       NEXT_PUBLIC_API_BASE=https://api.autoflow-research.fosivo.com
+vercel domains add autoflow-research.fosivo.com --scope <team>
+```
 
-# 3b. Create the tunnel + DNS record
+Then point `autoflow-research.fosivo.com` at Vercel with a Cloudflare
+**`CNAME → cname.vercel-dns.com`, DNS-only** (grey cloud — Vercel manages the
+TLS cert). `NEXT_PUBLIC_API_BASE` is inlined at build time, so the frontend
+calls the Render API directly.
+
+> The container prod-build "two Reacts" prerender bug that blocked a local
+> Docker frontend doesn't occur on Vercel — it builds Next.js natively.
+
+### Option B — throwaway local tunnel (Cloudflare Tunnel)
+
+Handy for a quick share from your own machine. One tunnel serves **both** the
+frontend and the API on a **single** origin (`/api/*` → backend, everything else
+→ frontend), so there's no CORS to manage.
+
+```bash
+cloudflared tunnel login                                   # authorize the zone (once)
 cloudflared tunnel create autoflow-demo
 cloudflared tunnel route dns autoflow-demo autoflow-research.fosivo.com
 ```
 
-**3c.** Create `~/.cloudflared/config.yml` (single-origin path routing):
+`cloudflared/config.yml` (single-origin path routing):
 
 ```yaml
 tunnel: autoflow-demo
@@ -82,48 +126,44 @@ ingress:
   - service: http_status:404
 ```
 
-**3d.** Serve it. The dev containers are great locally, but `next dev`'s HMR
-websocket can't tunnel and the demo needs a production frontend. Run the
-**backend (demo mode) in Docker** and the **frontend as a host production build**
-(single origin via the tunnel → no CORS, isolated `demo.db`):
+Serve the **backend (demo mode) in Docker** + the **frontend as a host
+production build** (`next dev`'s HMR websocket can't tunnel):
 
 ```bash
-# backend only, in demo mode (mock-forced, key entry locked, its own demo.db)
 docker compose -f docker-compose.yml -f docker-compose.demo.yml \
                -f docker-compose.tunnel.yml up -d backend
-
-# frontend: production build pinned to the public origin (inlined at build time)
 cd frontend
 NEXT_PUBLIC_API_BASE=https://autoflow-research.fosivo.com pnpm exec next build
 NEXT_PUBLIC_API_BASE=https://autoflow-research.fosivo.com pnpm exec next start -p 3000 &
-
-# the tunnel (routes /api → :8000, everything else → :3000)
-cd ..
-cloudflared tunnel --config cloudflared/config.yml run autoflow-demo
-# → https://autoflow-research.fosivo.com is live
+cd .. && cloudflared tunnel --config cloudflared/config.yml run autoflow-demo
 ```
 
-> Known issue: a production build **inside** the frontend container currently
-> fails prerendering `/_global-error` ("two Reacts" — duplicate React from the
-> container's node_modules), so we build on the host for now. The host build is
-> clean. Fixing the container build (e.g. a proper standalone prod image) would
-> let the whole demo run in Docker.
+Switching between A and B is just a Cloudflare DNS flip on
+`autoflow-research.fosivo.com` (Vercel CNAME ⇆ the tunnel's `*.cfargotunnel.com`,
+proxied).
 
-**3e.** Add the production redirect URI to your Google OAuth client:
-`https://autoflow-research.fosivo.com/api/v1/auth/google/callback`, and set
-`GOOGLE_REDIRECT_URI` + `AUTOFLOW_FRONTEND_URL` to the public origin.
+### Google OAuth (both options)
+
+Add the API's callback as an **Authorized redirect URI** on your Google OAuth
+client and set `GOOGLE_REDIRECT_URI` to match:
+
+- Option A: `https://api.autoflow-research.fosivo.com/api/v1/auth/google/callback`
+- Option B: `https://autoflow-research.fosivo.com/api/v1/auth/google/callback`
+
+Set `AUTOFLOW_FRONTEND_URL` to `https://autoflow-research.fosivo.com` either way.
 
 ---
 
 ## Notes
 
-- **Availability:** the tunnel is live only while your machine + `cloudflared
-  tunnel run` are up. For always-on, run it under a service (`cloudflared
-  service install`) on a small always-on box, or move to a hosted backend.
-- **Resetting demo data:** stop the stack and swap in a fresh DB
-  (`backend/data/`), or wire a scheduled reset — accumulated demo runs/accounts
-  otherwise pile up.
-- **Why not Cloudflare Pages for everything?** Pages/Workers can host the
-  Next.js frontend but not the FastAPI backend (long-running, SSE, SQLite). The
-  tunnel keeps the real backend on your machine; a persistent alternative is
-  frontend → Pages + backend → a container host (Fly.io/Railway/Render).
+- **Availability:** Option A is always-on (Vercel + Render free tiers; Render's
+  free instance cold-starts after idle, so the first request may take a few
+  seconds). Option B is live only while your machine + `cloudflared tunnel run`
+  are up.
+- **Resetting demo data:** Render's free disk is ephemeral, so the demo DB
+  resets on redeploy and the `AUTOFLOW_DEMO_ADMIN_*` seed recreates the admin.
+  Locally, swap in a fresh DB (`backend/data/`) or wire a scheduled reset.
+- **Why split origins on Vercel/Render but single-origin on the tunnel?** The
+  tunnel can path-route one hostname to two local ports, dodging CORS. Two
+  independent hosts can't, so we use the `api.` subdomain to stay same-site for
+  the cookie and whitelist the frontend origin for CORS.
