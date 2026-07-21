@@ -8,6 +8,7 @@ import { StatusBadge } from "@/components/run/status-badge";
 import { StageStepper } from "@/components/run/stage-stepper";
 import type { RunStatus } from "@/lib/types";
 import { statusMeta, formatDateTime } from "@/lib/format";
+import { templateLabel } from "@/lib/templates";
 
 export function RunHeader({
   query,
@@ -43,7 +44,7 @@ export function RunHeader({
       </Link>
 
       <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-        {template && <span className="eyebrow">{template.replace(/_/g, " ")}</span>}
+        {template && <span className="eyebrow">{templateLabel(template)}</span>}
         {createdAt && (
           <>
             <span className="text-muted-foreground/40">·</span>

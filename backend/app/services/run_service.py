@@ -175,8 +175,20 @@ class RunService:
         row = await self._runs.get(run_id)
         return row["owner_id"] if row is not None else None
 
-    async def list_runs(self, owner_id: str | None = None) -> list[dict[str, Any]]:
-        return [
+    async def list_runs(
+        self, owner_id: str | None = None, *, limit: int | None = None, offset: int = 0
+    ) -> tuple[list[dict[str, Any]], bool]:
+        """Return a page of runs (newest first) and whether more exist.
+
+        Fetches one extra row past ``limit`` to derive ``has_more`` without a
+        separate COUNT. ``limit=None`` returns everything (``has_more`` False).
+        """
+        fetch = None if limit is None else limit + 1
+        rows = await self._runs.list(owner_id, limit=fetch, offset=offset)
+        has_more = limit is not None and len(rows) > limit
+        if limit is not None:
+            rows = rows[:limit]
+        runs = [
             {
                 "run_id": r["id"],
                 "query": r["query"],
@@ -185,8 +197,9 @@ class RunService:
                 "created_at": r["created_at"],
                 "title": r["title"],
             }
-            for r in await self._runs.list(owner_id)
+            for r in rows
         ]
+        return runs, has_more
 
     async def get_detail(self, run_id: str) -> dict[str, Any] | None:
         row = await self._runs.get(run_id)

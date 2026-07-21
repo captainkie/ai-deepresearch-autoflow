@@ -4,6 +4,7 @@ import { ArrowUpRight } from "lucide-react";
 import { StatusBadge } from "@/components/run/status-badge";
 import type { RunSummary } from "@/lib/types";
 import { formatRelative } from "@/lib/format";
+import { templateLabel } from "@/lib/templates";
 
 export function RunCard({ run }: { run: RunSummary }) {
   const heading = run.title || run.query || "Untitled research";
@@ -30,8 +31,8 @@ export function RunCard({ run }: { run: RunSummary }) {
 
       <div className="mt-auto flex items-center gap-2 pt-1 text-xs text-muted-foreground">
         {run.template && (
-          <span className="rounded-full bg-secondary/50 px-2 py-0.5 font-medium capitalize">
-            {run.template.replace(/_/g, " ")}
+          <span className="rounded-full bg-secondary/50 px-2 py-0.5 font-medium">
+            {templateLabel(run.template)}
           </span>
         )}
         <span className="text-muted-foreground/40">·</span>

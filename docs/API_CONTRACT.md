@@ -58,7 +58,8 @@ type CreateRun = {
 `201 → { "run_id": string }`
 
 ### `GET /api/v1/runs`
-`200 → { "runs": RunSummary[] }` (newest first)
+Paginated, newest first. Query: `limit` (default 24, 1–100), `offset` (default 0).
+`200 → { "runs": RunSummary[], "has_more": boolean }`
 ```ts
 type RunSummary = { run_id: string; query: string; template: string; status: string; created_at: string; title?: string }
 ```

@@ -32,3 +32,27 @@ export const FALLBACK_TEMPLATES: Template[] = [
 ];
 
 export const DEFAULT_TEMPLATE_ID = "deep_research";
+
+/** Friendly display names for the built-in template ids (match the backend). */
+const TEMPLATE_LABELS: Record<string, string> = {
+  deep_research: "Deep Research",
+  competitor_brand: "Competitor Teardown",
+  market_landscape: "Market Landscape",
+  swot: "SWOT Analysis",
+  pricing_analysis: "Pricing Analysis",
+};
+
+/**
+ * A human label for a template id — the friendly name for known templates,
+ * otherwise the slug prettified (`market_landscape` → `Market Landscape`). Used
+ * in the run header and history cards so the label matches the home composer.
+ */
+export function templateLabel(id?: string): string {
+  if (!id) return "";
+  return (
+    TEMPLATE_LABELS[id] ??
+    id
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+  );
+}

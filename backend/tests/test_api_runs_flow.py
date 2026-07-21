@@ -75,6 +75,30 @@ async def test_list_runs_newest_first(auth_client):
     assert ids.index(second) < ids.index(first)
 
 
+async def test_list_runs_pagination(auth_client):
+    created = {await _create_run(auth_client, query=f"topic {i}") for i in range(5)}
+
+    page1 = (await auth_client.get("/api/v1/runs?limit=2")).json()
+    assert len(page1["runs"]) == 2
+    assert page1["has_more"] is True
+
+    page2 = (await auth_client.get("/api/v1/runs?limit=2&offset=2")).json()
+    assert len(page2["runs"]) == 2
+    assert page2["has_more"] is True
+
+    page3 = (await auth_client.get("/api/v1/runs?limit=2&offset=4")).json()
+    assert len(page3["runs"]) == 1
+    assert page3["has_more"] is False
+
+    # The three pages partition the whole set, no overlaps, no gaps.
+    got = [r["run_id"] for p in (page1, page2, page3) for r in p["runs"]]
+    assert len(got) == len(set(got)) == 5
+    assert set(got) == created
+
+    # limit is bounded (>= 1).
+    assert (await auth_client.get("/api/v1/runs?limit=0")).status_code == 422
+
+
 async def test_stream_unknown_run_404(auth_client):
     resp = await auth_client.get("/api/v1/runs/does-not-exist/stream")
     assert resp.status_code == 404

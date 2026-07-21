@@ -8,7 +8,7 @@ runs; an admin (or superadmin) may access any run. Non-owners get 404 rather tha
 from __future__ import annotations
 
 import aiosqlite
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sse_starlette.sse import EventSourceResponse
 
 from app.api import API_V1
@@ -54,11 +54,14 @@ async def create_run(
 
 @router.get("/runs")
 async def list_runs(
+    limit: int = Query(24, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     svc: RunService = Depends(get_run_service),
     user: aiosqlite.Row = Depends(get_current_user),
 ) -> RunsResponse:
     owner = None if _is_admin(user) else user["id"]
-    return RunsResponse(runs=[RunSummary(**row) for row in await svc.list_runs(owner)])
+    runs, has_more = await svc.list_runs(owner, limit=limit, offset=offset)
+    return RunsResponse(runs=[RunSummary(**row) for row in runs], has_more=has_more)
 
 
 @router.get("/runs/{run_id}")

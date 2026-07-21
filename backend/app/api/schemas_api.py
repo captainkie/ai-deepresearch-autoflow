@@ -116,6 +116,7 @@ class RunSummary(BaseModel):
 
 class RunsResponse(BaseModel):
     runs: list[RunSummary]
+    has_more: bool = False
 
 
 class PlanSectionIn(BaseModel):
