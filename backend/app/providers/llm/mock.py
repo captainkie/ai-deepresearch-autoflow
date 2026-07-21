@@ -9,6 +9,7 @@ no time-dependent content. Prompt builders may embed ``QUERY:`` / ``OBJECTIVE:``
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import AsyncIterator
 
 _STREAM_CHUNK = 40
@@ -78,6 +79,8 @@ class MockLLMProvider:
             return self._claims(messages)
         if tag == "verify":
             return self._verify(messages)
+        if tag == "contradiction":
+            return self._contradiction(messages)
         if tag == "compress":
             goal = _marker(messages, "GOAL") or "Section findings"
             return f"### {goal}\n- Key point drawn from the sources. [1]\n- Supporting detail. [2]"
@@ -134,6 +137,17 @@ class MockLLMProvider:
                     }
                 )
         return json.dumps({"verifications": verifications})
+
+    def _contradiction(self, messages: list[dict]) -> str:
+        """Two claims conflict (deterministically) iff they cite different numeric
+        values (e.g. $9 vs $12) for the same attribute."""
+        a = _marker(messages, "CLAIM_A") or ""
+        b = _marker(messages, "CLAIM_B") or ""
+        nums_a = set(re.findall(r"\d+", a))
+        nums_b = set(re.findall(r"\d+", b))
+        conflict = bool(nums_a and nums_b and nums_a != nums_b)
+        note = f"{a.strip()} vs {b.strip()}" if conflict else ""
+        return json.dumps({"conflict": conflict, "note": note})
 
     def _plan(self, messages: list[dict]) -> str:
         query = _marker(messages, "QUERY") or (_last_user(messages)[:120] or "the topic")
