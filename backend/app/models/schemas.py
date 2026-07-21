@@ -170,6 +170,9 @@ class RunConfig(BaseModel):
     language: Language = Language.en
     template: str = "deep_research"
     require_plan_approval: bool = False
+    # Engine v2 verifier (empty ⇒ reuse the main llm_provider/llm_model).
+    verifier_provider: str = ""
+    verifier_model: str = ""
     max_sections: int = 6
     max_iters_per_section: int = 2
     results_per_query: int = 6

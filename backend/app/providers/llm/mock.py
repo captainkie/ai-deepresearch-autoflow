@@ -76,6 +76,8 @@ class MockLLMProvider:
             return json.dumps({"need_more": False, "queries": []})
         if tag == "claims":
             return self._claims(messages)
+        if tag == "verify":
+            return self._verify(messages)
         if tag == "compress":
             goal = _marker(messages, "GOAL") or "Section findings"
             return f"### {goal}\n- Key point drawn from the sources. [1]\n- Supporting detail. [2]"
@@ -105,6 +107,33 @@ class MockLLMProvider:
             "stance": "neutral",
         }
         return json.dumps({"claims": [claim]})
+
+    def _verify(self, messages: list[dict]) -> str:
+        """Grounding-only verifier: a claim is 'supported' iff its quote appears
+        in the source text, else 'unsupported' — deterministic and offline."""
+        content = _last_user(messages)
+        source_text = ""
+        if "SOURCE TEXT:\n" in content:
+            source_text = content.split("SOURCE TEXT:\n", 1)[1].split("\n\nCLAIMS", 1)[0]
+        source_norm = " ".join(source_text.split()).lower()
+        verifications = []
+        if "CLAIMS" in content:
+            block = content.split("CLAIMS", 1)[1]
+            for line in block.splitlines():
+                parts = line.split("\t")
+                if len(parts) < 2:
+                    continue
+                claim_id, quote = parts[0].strip(), parts[1]
+                supported = " ".join(quote.split()).lower() in source_norm
+                verifications.append(
+                    {
+                        "claim_id": claim_id,
+                        "verdict": "supported" if supported else "unsupported",
+                        "confidence": 0.9 if supported else 0.2,
+                        "rationale": ("quote found in source" if supported else "quote not found"),
+                    }
+                )
+        return json.dumps({"verifications": verifications})
 
     def _plan(self, messages: list[dict]) -> str:
         query = _marker(messages, "QUERY") or (_last_user(messages)[:120] or "the topic")
