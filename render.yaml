@@ -1,0 +1,43 @@
+# Render Blueprint — the public demo BACKEND (FastAPI, demo mode).
+# The frontend is hosted separately on Cloudflare Pages (see docs/DEPLOY.md).
+#
+# Deploy: Render dashboard → New → Blueprint → pick this repo, or
+#   render blueprint launch   (Render CLI). Set the sync:false secrets after.
+services:
+  - type: web
+    name: autoflow-demo-api
+    runtime: docker
+    repo: https://github.com/captainkie/ai-deepresearch-autoflow
+    branch: feat/history-pagination-run-polish
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    healthCheckPath: /api/v1/health
+    envVars:
+      # dev app-env keeps secrets ephemeral (fine for a demo whose free-tier disk
+      # resets anyway); the refresh cookie stays Lax and works same-site because
+      # the API is a subdomain of the frontend (api. vs the apex).
+      - key: APP_ENV
+        value: development
+      - key: AUTOFLOW_DEMO_MODE
+        value: "true"
+      - key: AUTOFLOW_DB_PATH
+        value: /app/data/demo.db
+      - key: AUTOFLOW_CORS_ORIGINS
+        value: https://autoflow-research.fosivo.com
+      - key: AUTOFLOW_FRONTEND_URL
+        value: https://autoflow-research.fosivo.com
+      # Seed a superadmin each boot so the ephemeral demo isn't stuck on /setup.
+      - key: AUTOFLOW_DEMO_ADMIN_EMAIL
+        value: demo@autoflow-research.fosivo.com
+      - key: AUTOFLOW_DEMO_ADMIN_PASSWORD
+        sync: false
+      # Google OAuth (set in the dashboard; the redirect must be registered on
+      # the Google client and point at the API's custom domain).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        value: https://api.autoflow-research.fosivo.com/api/v1/auth/google/callback
