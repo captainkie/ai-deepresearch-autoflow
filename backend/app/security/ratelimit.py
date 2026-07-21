@@ -40,6 +40,24 @@ class SlidingWindowLimiter:
         return True
 
 
+def _client_ip(request: Request) -> str:
+    """The real client IP for rate-limit keying.
+
+    Prefer the left-most ``X-Forwarded-For`` hop (set by the hosting proxy, e.g.
+    Render/Cloudflare) over the socket peer — behind a proxy the peer is always
+    the proxy, so without this every client collapses into one shared bucket.
+    Note: ``X-Forwarded-For`` is client-spoofable when no trusted proxy overwrites
+    it; acceptable here since the demo forces mock providers (abuse can't run up
+    cost) and a real deployment should sit behind a proxy that sets it.
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        first = forwarded.split(",")[0].strip()
+        if first:
+            return first
+    return request.client.host if request.client else "unknown"
+
+
 def rate_limit(max_events: int, window_s: float, scope: str) -> Callable[..., None]:
     """Build a dependency that limits ``max_events`` per ``window_s`` per client IP."""
     limiter = SlidingWindowLimiter(max_events, window_s)
@@ -50,7 +68,7 @@ def rate_limit(max_events: int, window_s: float, scope: str) -> Callable[..., No
     ) -> None:
         if not settings.rate_limit_enabled:
             return
-        ip = request.client.host if request.client else "unknown"
+        ip = _client_ip(request)
         if not limiter.allow(f"{scope}:{ip}", time.monotonic()):
             raise HTTPException(
                 status.HTTP_429_TOO_MANY_REQUESTS,

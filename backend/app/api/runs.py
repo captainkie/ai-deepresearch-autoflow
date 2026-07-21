@@ -22,6 +22,7 @@ from app.api.schemas_api import (
     RunsResponse,
     RunSummary,
 )
+from app.security.ratelimit import rate_limit
 from app.security.rbac import ROLE_RANK, get_current_user, require_member
 from app.services.run_service import RunService
 
@@ -42,7 +43,11 @@ async def _authorize_run(run_id: str, user: aiosqlite.Row, svc: RunService) -> N
         raise HTTPException(status_code=404, detail="run not found")
 
 
-@router.post("/runs", status_code=201)
+@router.post(
+    "/runs",
+    status_code=201,
+    dependencies=[Depends(rate_limit(10, 60.0, "create_run"))],
+)
 async def create_run(
     body: CreateRun,
     svc: RunService = Depends(get_run_service),
