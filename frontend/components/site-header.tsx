@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, History, Settings, Plus } from "lucide-react";
+import { Compass, History, Settings, Plus, LogOut } from "lucide-react";
 
 import { BrandLockup } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/components/auth-provider";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -17,6 +24,10 @@ const NAV = [
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const { status, user, logout } = useAuth();
+
+  // The header only appears once you're signed in; auth screens stand alone.
+  if (status !== "authenticated" || !user) return null;
 
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
@@ -24,7 +35,10 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/65">
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center gap-4 px-4 sm:px-6">
-        <Link href="/" className="shrink-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/60">
+        <Link
+          href="/"
+          className="shrink-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring/60"
+        >
           <BrandLockup />
         </Link>
 
@@ -59,6 +73,43 @@ export function SiteHeader() {
               New research
             </Link>
           </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 gap-2 px-1.5"
+                aria-label="Account menu"
+              >
+                <span className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                  {user.name.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="hidden max-w-[7rem] truncate text-sm sm:inline">
+                  {user.name}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5">
+                <p className="truncate text-sm font-medium">{user.name}</p>
+                <p className="truncate text-xs text-muted-foreground">{user.email}</p>
+                <p className="mt-0.5 text-xs capitalize text-muted-foreground/80">
+                  {user.role}
+                </p>
+              </div>
+              <div className="my-1 h-px bg-border" />
+              <DropdownMenuItem
+                onClick={() => {
+                  void logout();
+                }}
+                className="gap-2 text-destructive focus:text-destructive"
+              >
+                <LogOut className="size-4" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

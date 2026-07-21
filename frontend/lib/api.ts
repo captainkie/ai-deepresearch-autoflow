@@ -1,17 +1,27 @@
 /**
  * AutoFlow Research — typed REST client.
  *
- * Implements the endpoints from `docs/API_CONTRACT.md`. Every call is a thin,
- * typed wrapper around `fetch`. Callers are expected to try/catch so the UI can
- * degrade gracefully when the backend is offline (empty/skeleton states).
+ * Implements the endpoints from `docs/API_CONTRACT.md`. Requests carry the
+ * in-memory access token as `Authorization: Bearer` and always include cookies
+ * (for the refresh flow). On a 401 the client transparently refreshes the access
+ * token once and retries; if that fails it notifies the AuthProvider.
  */
+import {
+  getAccessToken,
+  notifyUnauthenticated,
+  refreshAccessToken,
+  setAccessToken,
+} from "./auth";
 import type {
   ConfigResponse,
   ConfigUpdate,
   CreateRun,
   RunDetail,
   RunSummary,
+  Session,
+  SetupStatus,
   Template,
+  User,
 } from "./types";
 
 export const API_BASE = (
@@ -29,18 +39,39 @@ export class ApiError extends Error {
 
 type RequestOptions = RequestInit & { parseJson?: boolean };
 
+// Paths that manage auth themselves — never try to refresh-and-retry on their 401.
+function isAuthPath(path: string): boolean {
+  return path.startsWith("/api/auth/") || path.startsWith("/api/setup");
+}
+
 async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
   const { parseJson = true, headers, ...rest } = opts;
-  const res = await fetch(`${API_BASE}${path}`, {
-    // Research data is always live; never serve a cached run.
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      ...headers,
-    },
-    ...rest,
-  });
+
+  const send = () => {
+    const token = getAccessToken();
+    return fetch(`${API_BASE}${path}`, {
+      cache: "no-store",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...headers,
+      },
+      ...rest,
+    });
+  };
+
+  let res = await send();
+
+  if (res.status === 401 && !isAuthPath(path)) {
+    const refreshed = await refreshAccessToken();
+    if (refreshed) {
+      res = await send();
+    } else {
+      notifyUnauthenticated();
+    }
+  }
 
   if (!res.ok) {
     let message = `Request failed (${res.status})`;
@@ -61,6 +92,63 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 // --- Health -------------------------------------------------------------
 export function getHealth() {
   return request<{ status: string; version: string }>("/api/health");
+}
+
+// --- Auth & setup -------------------------------------------------------
+export function getSetupStatus(): Promise<SetupStatus> {
+  return request<SetupStatus>("/api/setup/status");
+}
+
+export async function runSetup(body: {
+  email: string;
+  name: string;
+  password: string;
+}): Promise<Session> {
+  const data = await request<Session>("/api/setup", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  setAccessToken(data.access_token);
+  return data;
+}
+
+export async function login(email: string, password: string): Promise<Session> {
+  const data = await request<Session>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  setAccessToken(data.access_token);
+  return data;
+}
+
+export async function register(body: {
+  email: string;
+  name: string;
+  password: string;
+}): Promise<Session> {
+  const data = await request<Session>("/api/auth/register", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+  setAccessToken(data.access_token);
+  return data;
+}
+
+export async function logout(): Promise<void> {
+  try {
+    await request<{ ok: boolean }>("/api/auth/logout", { method: "POST" });
+  } finally {
+    setAccessToken(null);
+  }
+}
+
+export function getMe(): Promise<User> {
+  return request<User>("/api/auth/me");
+}
+
+export async function googleStartUrl(): Promise<string> {
+  const data = await request<{ auth_url: string }>("/api/auth/google/start");
+  return data.auth_url;
 }
 
 // --- Templates ----------------------------------------------------------
