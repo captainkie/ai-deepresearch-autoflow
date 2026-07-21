@@ -95,7 +95,9 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
 // --- Health -------------------------------------------------------------
 export function getHealth() {
-  return request<{ status: string; version: string }>("/api/v1/health");
+  return request<{ status: string; version: string; demo_mode?: boolean }>(
+    "/api/v1/health",
+  );
 }
 
 // --- Auth & setup -------------------------------------------------------

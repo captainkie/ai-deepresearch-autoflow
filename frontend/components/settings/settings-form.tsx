@@ -10,6 +10,7 @@ import {
   Check,
   RefreshCw,
   WifiOff,
+  FlaskConical,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -237,9 +238,19 @@ export function SettingsForm() {
   const modelSuggestions = PROVIDER_MODELS[form.llm_provider] ?? [];
   const modelIsCustom =
     modelSuggestions.length === 0 || !modelSuggestions.includes(form.llm_model);
+  const demo = !!config.demo_mode;
 
   return (
     <div className="flex flex-col gap-5">
+      {demo && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-amber-500/30 bg-amber-500/[0.06] px-4 py-3 text-sm text-muted-foreground">
+          <FlaskConical className="mt-0.5 size-4 shrink-0 text-amber-600" />
+          <span>
+            Settings are <span className="font-medium text-foreground">read-only in the demo</span>{" "}
+            — every run uses the built-in mock providers, so there are no API keys to configure.
+          </span>
+        </div>
+      )}
       {/* Models & providers */}
       <Card>
         <CardHeader className="border-b">
@@ -491,7 +502,7 @@ export function SettingsForm() {
         </span>
         <Button
           onClick={handleSave}
-          disabled={!dirty || saving}
+          disabled={!dirty || saving || demo}
           className="gap-1.5"
         >
           {saving ? (

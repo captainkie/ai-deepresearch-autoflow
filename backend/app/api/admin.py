@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.api import API_V1
-from app.api.deps import get_auth_service, get_vault_service
+from app.api.deps import forbid_in_demo, get_auth_service, get_vault_service
 from app.security.keys import MasterKeyError, decode_master_key
 from app.security.rbac import ROLE_RANK, get_current_user, require_admin, require_superadmin
 from app.services.auth_service import AuthService
@@ -45,7 +45,11 @@ async def list_credentials(
     return {"credentials": await vault.list_credentials(provider)}
 
 
-@router.post("/credentials", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/credentials",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(forbid_in_demo)],
+)
 async def create_credential(
     body: CredentialCreate,
     actor: aiosqlite.Row = Depends(get_current_user),
@@ -60,7 +64,10 @@ async def create_credential(
     )
 
 
-@router.post("/credentials/rotate", dependencies=[Depends(require_superadmin)])
+@router.post(
+    "/credentials/rotate",
+    dependencies=[Depends(require_superadmin), Depends(forbid_in_demo)],
+)
 async def rotate_master_key(
     body: RotateRequest,
     actor: aiosqlite.Row = Depends(get_current_user),

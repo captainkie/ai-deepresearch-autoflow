@@ -143,6 +143,10 @@ class RunService:
         llm_model = cfg_in.llm_model or current["llm"]["model"] or "mock-1"
         search_provider = cfg_in.search_provider or current["search"]["provider"] or "mock"
         crawl_provider = "mock"  # not exposed in the contract yet; mock in dev
+        if self._app.demo_mode:
+            # Public demo: never touch a real provider (no cost, no key exposure).
+            llm_provider, llm_model = "mock", "mock-1"
+            search_provider = "mock"
         template = create.template or "deep_research"
         language = create.language or self._app.default_language
         require = create.require_plan_approval

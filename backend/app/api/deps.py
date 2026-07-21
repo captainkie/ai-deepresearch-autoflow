@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from fastapi import Request
+from fastapi import Depends, HTTPException, Request, status
 
 from app.db.database import Database
 from app.services.config_service import ConfigService
@@ -27,6 +27,14 @@ def get_db(request: Request) -> Database:
 
 def get_app_settings(request: Request) -> "AppSettings":
     return request.app.state.settings
+
+
+def forbid_in_demo(settings: "AppSettings" = Depends(get_app_settings)) -> None:
+    """Block a mutating/secret-entry action when running as a public demo."""
+    if settings.demo_mode:
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "This action is disabled in the public demo."
+        )
 
 
 def get_config_service(request: Request) -> ConfigService:

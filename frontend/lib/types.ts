@@ -92,6 +92,7 @@ export type ConfigResponse = {
   search: { provider: string; available: string[] };
   require_plan_approval: boolean;
   verification_level?: VerificationLevel;
+  demo_mode?: boolean;
 };
 
 export type ConfigUpdate = Partial<{

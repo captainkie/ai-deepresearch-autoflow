@@ -21,6 +21,7 @@ NameField = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1
 class HealthResponse(BaseModel):
     status: str
     version: str
+    demo_mode: bool = False
 
 
 class AuthorOut(BaseModel):
@@ -65,6 +66,7 @@ class ConfigResponse(BaseModel):
     search: SearchConfig
     require_plan_approval: bool
     verification_level: str = "light"
+    demo_mode: bool = False
 
 
 class ConfigUpdate(BaseModel):

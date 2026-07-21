@@ -2,12 +2,13 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { KeyRound, Plus, RefreshCw } from "lucide-react";
+import { KeyRound, Plus, RefreshCw, FlaskConical } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import {
   createCredential,
+  getHealth,
   listCredentials,
   revokeCredential,
   rotateMasterKey,
@@ -51,6 +52,19 @@ export function CredentialsPanel() {
   const [creds, setCreds] = React.useState<Credential[] | null>(null);
   const [pendingKey, setPendingKey] = React.useState<string | null>(null);
   const [rotating, setRotating] = React.useState(false);
+  const [demo, setDemo] = React.useState(false);
+
+  React.useEffect(() => {
+    let active = true;
+    getHealth()
+      .then((h) => {
+        if (active) setDemo(!!h.demo_mode);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const form = useForm<CredentialValues>({
     resolver: zodResolver(credentialSchema),
@@ -138,6 +152,15 @@ export function CredentialsPanel() {
           <p className="mb-3 flex items-center gap-1.5 text-sm font-medium">
             <Plus className="size-4 text-primary" /> Add a provider key
           </p>
+          {demo && (
+            <div className="mb-3 flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/[0.06] px-3 py-2 text-xs text-muted-foreground">
+              <FlaskConical className="mt-0.5 size-3.5 shrink-0 text-amber-600" />
+              <span>
+                Adding keys is disabled in the demo. Don&apos;t paste a real API
+                key here — the demo runs entirely on mock providers.
+              </span>
+            </div>
+          )}
           <div className="grid gap-3 sm:grid-cols-[8rem_9rem_minmax(0,1fr)_9.5rem_auto] sm:items-start">
             <FormField
               control={form.control}
@@ -185,6 +208,7 @@ export function CredentialsPanel() {
                       type="password"
                       placeholder="sk-…"
                       autoComplete="off"
+                      disabled={demo}
                       {...field}
                     />
                   </FormControl>
@@ -214,7 +238,7 @@ export function CredentialsPanel() {
               </span>
               <Button
                 type="submit"
-                disabled={form.formState.isSubmitting}
+                disabled={form.formState.isSubmitting || demo}
                 className="h-8"
               >
                 Add

@@ -32,6 +32,9 @@ class AppSettings(BaseSettings):
     default_require_plan_approval: bool = True
     # In-process rate limiting on auth endpoints (disable in tests).
     rate_limit_enabled: bool = True
+    # Public demo hardening: force mock providers, and refuse credential entry /
+    # provider switching so nobody can run up cost or paste a real API key.
+    demo_mode: bool = False
 
     # --- security (M3) ---
     # ``APP_ENV`` is intentionally un-prefixed (shared convention); the vault KEK

@@ -5,6 +5,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/components/auth-provider";
 import { RouteGuard } from "@/components/route-guard";
+import { DemoBanner } from "@/components/demo-banner";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -59,6 +60,7 @@ export default function RootLayout({
         >
           <TooltipProvider delayDuration={200}>
             <AuthProvider>
+              <DemoBanner />
               <SiteHeader />
               <main className="flex-1">
                 <RouteGuard>{children}</RouteGuard>
