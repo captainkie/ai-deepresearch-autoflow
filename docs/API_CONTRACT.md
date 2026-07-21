@@ -37,13 +37,17 @@ Current provider config + which providers are available (have credentials).
 type ConfigResponse = {
   llm: { provider: string; model: string; available: string[] };
   search: { provider: string; available: string[] };
+  // Optional separate verifier model; empty strings ⇒ reuse the main llm.
+  verifier: { provider: string; model: string };
   require_plan_approval: boolean;
+  verification_level?: "off" | "light" | "strict";
+  demo_mode?: boolean;
 }
 ```
 
 ### `POST /api/v1/config`
 Update runtime config (does not persist secrets to disk; keys come from env).
-Body: `Partial<{ llm_provider, llm_model, search_provider, require_plan_approval }>` → `ConfigResponse`.
+Body: `Partial<{ llm_provider, llm_model, search_provider, verifier_provider, verifier_model, require_plan_approval, verification_level }>` → `ConfigResponse`. `admin+`; refused in demo mode.
 
 ### `POST /api/v1/runs`
 Create a run. Body:

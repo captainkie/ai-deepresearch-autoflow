@@ -64,6 +64,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const CUSTOM_MODEL = "__custom__";
+const SAME_AS_MAIN = "__same__"; // verifier reuses the main language model
 
 /** All known providers ∪ whatever the backend reports, each tagged available. */
 function providerOptions(
@@ -79,6 +80,8 @@ type FormState = {
   llm_provider: string;
   llm_model: string;
   search_provider: string;
+  verifier_provider: string;
+  verifier_model: string;
   require_plan_approval: boolean;
   verification_level: VerificationLevel;
 };
@@ -88,6 +91,8 @@ function toForm(c: ConfigResponse): FormState {
     llm_provider: c.llm.provider ?? "",
     llm_model: c.llm.model ?? "",
     search_provider: c.search.provider ?? "",
+    verifier_provider: c.verifier?.provider ?? "",
+    verifier_model: c.verifier?.model ?? "",
     require_plan_approval: c.require_plan_approval,
     verification_level: c.verification_level ?? "light",
   };
@@ -168,6 +173,10 @@ export function SettingsForm() {
       payload.require_plan_approval = form.require_plan_approval;
     if (form.verification_level !== base.verification_level)
       payload.verification_level = form.verification_level;
+    if (form.verifier_provider !== base.verifier_provider)
+      payload.verifier_provider = form.verifier_provider;
+    if (form.verifier_model !== base.verifier_model)
+      payload.verifier_model = form.verifier_model;
 
     setSaving(true);
     try {
@@ -238,6 +247,15 @@ export function SettingsForm() {
   const modelSuggestions = PROVIDER_MODELS[form.llm_provider] ?? [];
   const modelIsCustom =
     modelSuggestions.length === 0 || !modelSuggestions.includes(form.llm_model);
+  const verifierOptions = providerOptions(
+    LLM_PROVIDERS,
+    config.llm.available,
+    form.verifier_provider || undefined,
+  );
+  const verifierModelSuggestions = PROVIDER_MODELS[form.verifier_provider] ?? [];
+  const verifierModelIsCustom =
+    verifierModelSuggestions.length === 0 ||
+    !verifierModelSuggestions.includes(form.verifier_model);
   const demo = !!config.demo_mode;
 
   return (
@@ -459,6 +477,104 @@ export function SettingsForm() {
                 </SelectGroup>
               </SelectContent>
             </Select>
+          </Field>
+
+          <Field orientation="responsive" className="border-t pt-5">
+            <FieldContent>
+              <FieldLabel htmlFor="verifier-provider">Verifier model</FieldLabel>
+              <FieldDescription>
+                An optional cheaper/faster model that double-checks each claim.
+                Leave as “Same as language model” to reuse the one above.
+              </FieldDescription>
+            </FieldContent>
+            <div className="flex flex-col gap-2 sm:w-56">
+              <Select
+                value={form.verifier_provider || SAME_AS_MAIN}
+                onValueChange={(v) =>
+                  setForm({
+                    ...form,
+                    verifier_provider: v === SAME_AS_MAIN ? "" : v,
+                    verifier_model:
+                      v === SAME_AS_MAIN ? "" : (defaultModelFor(v) ?? ""),
+                  })
+                }
+              >
+                <SelectTrigger id="verifier-provider">
+                  <SelectValue placeholder="Same as language model" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectItem value={SAME_AS_MAIN}>
+                      Same as language model
+                    </SelectItem>
+                    {verifierOptions.map(({ id, available }) => (
+                      <SelectItem key={id} value={id} disabled={!available}>
+                        {providerLabel(id)}
+                        {!available ? " · needs key" : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              {form.verifier_provider ? (
+                verifierModelSuggestions.length > 0 ? (
+                  <>
+                    <Select
+                      value={
+                        verifierModelIsCustom
+                          ? CUSTOM_MODEL
+                          : form.verifier_model
+                      }
+                      onValueChange={(v) =>
+                        setForm({
+                          ...form,
+                          verifier_model: v === CUSTOM_MODEL ? "" : v,
+                        })
+                      }
+                    >
+                      <SelectTrigger className="font-mono text-sm">
+                        <SelectValue placeholder="Select a model" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          {verifierModelSuggestions.map((m) => (
+                            <SelectItem
+                              key={m}
+                              value={m}
+                              className="font-mono text-sm"
+                            >
+                              {m}
+                            </SelectItem>
+                          ))}
+                          <SelectItem value={CUSTOM_MODEL}>Custom…</SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                    {verifierModelIsCustom ? (
+                      <Input
+                        value={form.verifier_model}
+                        onChange={(e) =>
+                          setForm({ ...form, verifier_model: e.target.value })
+                        }
+                        placeholder="Custom model id"
+                        aria-label="Custom verifier model id"
+                        className="font-mono text-sm"
+                      />
+                    ) : null}
+                  </>
+                ) : (
+                  <Input
+                    value={form.verifier_model}
+                    onChange={(e) =>
+                      setForm({ ...form, verifier_model: e.target.value })
+                    }
+                    placeholder="e.g. gpt-4o-mini"
+                    aria-label="Verifier model id"
+                    className="font-mono text-sm"
+                  />
+                )
+              ) : null}
+            </div>
           </Field>
         </CardContent>
       </Card>

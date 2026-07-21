@@ -323,6 +323,9 @@ class RunService:
         if row is None:
             raise LookupError(run_id)
         current = await self._config.current()
+        # In the public demo the verifier must also stay on the mock llm — empty
+        # ⇒ reuse the (already mock-forced) main provider, never a real one.
+        verifier = {} if self._app.demo_mode else current.get("verifier", {})
         config = RunConfig(
             llm_provider=row["llm_provider"] or "mock",
             llm_model=row["llm_model"] or "mock-1",
@@ -332,6 +335,8 @@ class RunService:
             template=row["template"],
             require_plan_approval=bool(row["require_plan_approval"]),
             verification_level=current.get("verification_level", "light"),
+            verifier_provider=verifier.get("provider", ""),
+            verifier_model=verifier.get("model", ""),
         )
         return row["query"], config
 

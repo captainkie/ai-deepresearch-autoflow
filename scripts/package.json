@@ -1,0 +1,13 @@
+{
+  "name": "autoflow-scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Dev tooling for ai-dpr-autoflow — reproducible product screenshots (see capture-screenshots.mjs).",
+  "scripts": {
+    "capture": "node capture-screenshots.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.40.0"
+  }
+}

@@ -225,6 +225,15 @@ ai-deepresearch-autoflow/
     └── SECURITY.md            # security model & threat notes
 ```
 
+## Documentation
+
+- **[docs/INSTALL.md](docs/INSTALL.md)** — prerequisites, clone, backend + frontend setup, first-run superadmin, dev/prod run, troubleshooting.
+- **[docs/CONFIGURATION.md](docs/CONFIGURATION.md)** — every environment variable, generating secrets, provider selection, `verification_level`.
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — the engine loop, layering, request/data flow, security at a glance, and how to add a provider.
+- **[docs/API_CONTRACT.md](docs/API_CONTRACT.md)** — the REST + SSE contract (authoritative wire shapes).
+- **[docs/SECURITY.md](docs/SECURITY.md)** — credential vault, auth/RBAC, threat notes, reporting a vulnerability.
+- **[docs/DEMO.md](docs/DEMO.md)** — stand up your own hosted, mock-only public demo.
+
 ## API
 
 REST + SSE, all under **`/api/v1`** (single source of truth: `API_V1` in

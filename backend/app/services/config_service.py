@@ -32,6 +32,8 @@ _WRITABLE = (
     "llm_provider",
     "llm_model",
     "search_provider",
+    "verifier_provider",
+    "verifier_model",
     "require_plan_approval",
     "verification_level",
 )
@@ -85,6 +87,10 @@ class ConfigService:
             "search": {
                 "provider": stored.get("search_provider", _DEFAULT_SEARCH_PROVIDER),
                 "available": search_available,
+            },
+            "verifier": {
+                "provider": stored.get("verifier_provider", ""),
+                "model": stored.get("verifier_model", ""),
             },
             "require_plan_approval": bool(require),
             "verification_level": stored.get("verification_level") or "light",
