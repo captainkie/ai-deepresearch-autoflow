@@ -13,10 +13,20 @@ import { ProgressTimeline } from "@/components/run/progress-timeline";
 import { PlanReviewCard } from "@/components/run/plan-review-card";
 import { ReportView } from "@/components/run/report-view";
 import { ThinkingState } from "@/components/run/thinking-state";
+import { deriveConfidenceSummary } from "@/components/run/confidence-summary";
+import type { ConfidenceSummary } from "@/lib/types";
 
 export function RunView({ runId }: { runId: string }) {
   const s = useResearchStream(runId);
   const [canceling, setCanceling] = React.useState(false);
+
+  // Prefer the server's authoritative summary (arrives on report/done); fall
+  // back to a live projection of the claims streamed so far.
+  const confidenceSummary: ConfidenceSummary | undefined =
+    s.confidenceSummary ??
+    (s.claims.length
+      ? deriveConfidenceSummary(s.claims, s.contradictions)
+      : undefined);
 
   async function handleCancel() {
     setCanceling(true);
@@ -134,6 +144,7 @@ export function RunView({ runId }: { runId: string }) {
             reportTitle={s.title}
             query={s.query}
             streaming={streaming}
+            confidenceSummary={confidenceSummary}
           />
         </div>
       </div>
@@ -155,6 +166,7 @@ function MainContent({
   streaming,
   reportTitle,
   query,
+  confidenceSummary,
 }: {
   status: string;
   statusMessage: string;
@@ -169,12 +181,18 @@ function MainContent({
   streaming: boolean;
   reportTitle?: string;
   query?: string;
+  confidenceSummary?: ConfidenceSummary;
 }) {
   if (status === "error" && error) {
     return (
       <div className="space-y-5">
         {hasReport && (
-          <ReportView markdown={report} title={reportTitle} query={query} />
+          <ReportView
+            markdown={report}
+            title={reportTitle}
+            query={query}
+            summary={confidenceSummary}
+          />
         )}
         <Alert variant="destructive">
           <AlertTriangle />
@@ -197,7 +215,12 @@ function MainContent({
     return (
       <div className="space-y-5">
         {hasReport && (
-          <ReportView markdown={report} title={reportTitle} query={query} />
+          <ReportView
+            markdown={report}
+            title={reportTitle}
+            query={query}
+            summary={confidenceSummary}
+          />
         )}
         <Alert>
           <Ban />
@@ -241,6 +264,7 @@ function MainContent({
         title={reportTitle}
         query={query}
         streaming={streaming}
+        summary={confidenceSummary}
       />
     );
   }

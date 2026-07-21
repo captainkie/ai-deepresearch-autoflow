@@ -25,6 +25,9 @@ import {
   refreshAccessToken,
 } from "./auth";
 import type {
+  ClaimData,
+  ConfidenceSummary,
+  ContradictionData,
   DoneData,
   ErrorData,
   NoteData,
@@ -40,7 +43,15 @@ import type {
   Source,
   SourceData,
   StatusData,
+  Verdict,
+  VerificationData,
 } from "./types";
+
+/** A claim plus the verifier's verdict once it arrives. */
+export type ClaimState = ClaimData & {
+  verdict?: Verdict;
+  confidence?: number;
+};
 
 export type SectionState = {
   id: string;
@@ -70,6 +81,10 @@ export type StreamState = {
   title?: string;
   sourceCount?: number;
   error?: string;
+  // Engine v2 trust data.
+  claims: ClaimState[];
+  contradictions: ContradictionData[];
+  confidenceSummary?: ConfidenceSummary;
 };
 
 const INITIAL: StreamState = {
@@ -80,6 +95,8 @@ const INITIAL: StreamState = {
   sections: [],
   report: "",
   reportFinal: false,
+  claims: [],
+  contradictions: [],
 };
 
 type Action =
@@ -177,6 +194,27 @@ function reduceEvent(state: StreamState, event: ResearchEvent): StreamState {
         })),
       };
     }
+    case "claim": {
+      const d = event.data as ClaimData;
+      if (state.claims.some((c) => c.claim_id === d.claim_id)) return state;
+      return { ...state, claims: [...state.claims, { ...d }] };
+    }
+    case "verification": {
+      const d = event.data as VerificationData;
+      return {
+        ...state,
+        claims: state.claims.map((c) =>
+          c.claim_id === d.claim_id
+            ? { ...c, verdict: d.verdict, confidence: d.confidence }
+            : c,
+        ),
+      };
+    }
+    case "contradiction": {
+      const d = event.data as ContradictionData;
+      if (state.contradictions.some((c) => c.id === d.id)) return state;
+      return { ...state, contradictions: [...state.contradictions, d] };
+    }
     case "note": {
       const d = event.data as NoteData;
       return {
@@ -210,6 +248,7 @@ function reduceEvent(state: StreamState, event: ResearchEvent): StreamState {
         report: d.markdown ?? state.report,
         reportFinal: true,
         title: d.title ?? state.title,
+        confidenceSummary: d.confidence_summary ?? state.confidenceSummary,
       };
     }
     case "error": {
@@ -229,6 +268,7 @@ function reduceEvent(state: StreamState, event: ResearchEvent): StreamState {
         reportFinal: true,
         title: d.title ?? state.title,
         sourceCount: d.source_count ?? state.sourceCount,
+        confidenceSummary: d.confidence_summary ?? state.confidenceSummary,
       };
     }
     default:
@@ -392,6 +432,9 @@ export function useResearchStream(
           if (detail.report) {
             payload.report = detail.report;
             payload.reportFinal = detail.status === "done";
+          }
+          if (detail.confidence_summary) {
+            payload.confidenceSummary = detail.confidence_summary;
           }
           dispatch({ type: "hydrate", payload });
           setLoadingDetail(false);

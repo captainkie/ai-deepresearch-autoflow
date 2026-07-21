@@ -10,11 +10,19 @@
 // Templates & config
 // ---------------------------------------------------------------------------
 
+export type VerificationLevel = "off" | "light" | "strict";
+
+export type EntityField = { key: string; label: string; type: "text" | "list" };
+
 export type Template = {
   id: string;
   name: string;
   description: string;
   audience: string;
+  // Engine v2 (M3.5b): entity_mode templates compare entities in a table.
+  entity_mode?: boolean;
+  entity_schema?: EntityField[];
+  verification_level?: VerificationLevel;
 };
 
 // ---------------------------------------------------------------------------
@@ -83,6 +91,7 @@ export type ConfigResponse = {
   llm: { provider: string; model: string; available: string[] };
   search: { provider: string; available: string[] };
   require_plan_approval: boolean;
+  verification_level?: VerificationLevel;
 };
 
 export type ConfigUpdate = Partial<{
@@ -90,6 +99,7 @@ export type ConfigUpdate = Partial<{
   llm_model: string;
   search_provider: string;
   require_plan_approval: boolean;
+  verification_level: VerificationLevel;
 }>;
 
 // ---------------------------------------------------------------------------
@@ -159,6 +169,7 @@ export type RunDetail = {
   sections?: PlanSection[];
   report?: string; // Markdown
   sources?: Source[];
+  confidence_summary?: ConfidenceSummary; // Engine v2 — persisted from the report event
 };
 
 // ---------------------------------------------------------------------------
@@ -171,6 +182,9 @@ export type EventType =
   | "awaiting_plan"
   | "search"
   | "source"
+  | "claim"
+  | "verification"
+  | "contradiction"
   | "note"
   | "section_start"
   | "section_done"
@@ -194,6 +208,38 @@ export type AwaitingPlanData = Record<string, never>;
 export type SearchData = { section_id: string; query: string };
 export type SourceData = { section_id: string; source: Source };
 export type NoteData = { section_id: string; content: string };
+
+// Engine v2 (M3.5): claim-grounded verification.
+export type Verdict = "supported" | "partial" | "unsupported" | "contradicted";
+export type ConfidenceLevel = "high" | "medium" | "low";
+export type ClaimData = {
+  claim_id: string;
+  section_id: string;
+  text: string;
+  entity?: string | null;
+  attribute?: string | null;
+  source_ids: number[];
+  quote?: string;
+};
+export type VerificationData = {
+  claim_id: string;
+  verdict: Verdict;
+  confidence: number;
+  rationale?: string;
+};
+export type ContradictionData = {
+  id: string;
+  entity?: string | null;
+  attribute?: string | null;
+  claim_ids: [string, string];
+  note?: string;
+};
+export type ConfidenceSummary = {
+  high: number;
+  medium: number;
+  low: number;
+  contradictions: number;
+};
 export type SectionStartData = { section_id: string; title: string };
 export type SectionDoneData = {
   section_id: string;
@@ -201,6 +247,14 @@ export type SectionDoneData = {
   source_count: number;
 };
 export type ReportDeltaData = { text: string };
-export type ReportData = { markdown: string; title: string };
+export type ReportData = {
+  markdown: string;
+  title: string;
+  confidence_summary?: ConfidenceSummary;
+};
 export type ErrorData = { message: string };
-export type DoneData = { title: string; source_count: number };
+export type DoneData = {
+  title: string;
+  source_count: number;
+  confidence_summary?: ConfidenceSummary;
+};

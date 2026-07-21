@@ -6,19 +6,23 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { ReportMarkdown, extractToc } from "@/components/markdown";
+import { ConfidenceSummaryBar } from "@/components/run/confidence-summary";
 import { slugify } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import type { ConfidenceSummary } from "@/lib/types";
 
 export function ReportView({
   markdown,
   title,
   query,
   streaming = false,
+  summary,
 }: {
   markdown: string;
   title?: string;
   query?: string;
   streaming?: boolean;
+  summary?: ConfidenceSummary;
 }) {
   const [copied, setCopied] = React.useState(false);
   const toc = React.useMemo(() => extractToc(markdown), [markdown]);
@@ -113,6 +117,10 @@ export function ReportView({
             </Button>
           </div>
         </div>
+
+        {summary && (
+          <ConfidenceSummaryBar summary={summary} className="mb-5" />
+        )}
 
         <div ref={articleRef}>
           <ReportMarkdown content={markdown} />

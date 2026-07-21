@@ -212,6 +212,7 @@ class RunService:
             "error": row["error"],
             "created_at": row["created_at"],
             "updated_at": row["updated_at"],
+            "confidence_summary": await self._confidence_from_events(run_id),
             "plan": await self._plan_from_events(run_id),
             "sections": [
                 {
@@ -242,6 +243,14 @@ class RunService:
             if row["type"] == EventType.plan.value:
                 data = json.loads(row["data_json"])
                 return {"brief": data.get("brief", ""), "sections": data.get("sections", [])}
+        return None
+
+    async def _confidence_from_events(self, run_id: str) -> dict[str, Any] | None:
+        """The trust summary the engine attached to the report event (if any), so
+        a reloaded finished run shows its confidence badge without a live stream."""
+        for row in reversed(await self._events.list_by_run(run_id)):
+            if row["type"] == EventType.report.value:
+                return json.loads(row["data_json"]).get("confidence_summary")
         return None
 
     # --- Execution -----------------------------------------------------------

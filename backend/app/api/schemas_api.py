@@ -160,6 +160,13 @@ class RunProviders(BaseModel):
     crawl_provider: str | None = None
 
 
+class ConfidenceSummaryOut(BaseModel):
+    high: int = 0
+    medium: int = 0
+    low: int = 0
+    contradictions: int = 0
+
+
 class RunDetail(BaseModel):
     run_id: str
     query: str
@@ -173,6 +180,7 @@ class RunDetail(BaseModel):
     error: str | None = None
     created_at: str
     updated_at: str
+    confidence_summary: ConfidenceSummaryOut | None = None
     plan: PlanOut | None = None
     sections: list[SectionOut] = Field(default_factory=list)
     sources: list[SourceOut] = Field(default_factory=list)
