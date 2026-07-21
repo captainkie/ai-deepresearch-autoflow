@@ -68,13 +68,23 @@ class RunRepo:
     async def get(self, run_id: str) -> aiosqlite.Row | None:
         return await self._db.fetchone("SELECT * FROM runs WHERE id = ?", (run_id,))
 
-    async def list(self, owner_id: str | None = None) -> list[aiosqlite.Row]:
-        if owner_id is None:
-            return await self._db.fetchall("SELECT * FROM runs ORDER BY created_at DESC, id DESC")
-        return await self._db.fetchall(
-            "SELECT * FROM runs WHERE owner_id = ? ORDER BY created_at DESC, id DESC",
-            (owner_id,),
-        )
+    async def list(
+        self,
+        owner_id: str | None = None,
+        *,
+        limit: int | None = None,
+        offset: int = 0,
+    ) -> list[aiosqlite.Row]:
+        sql = "SELECT * FROM runs"
+        params: tuple = ()
+        if owner_id is not None:
+            sql += " WHERE owner_id = ?"
+            params = (owner_id,)
+        sql += " ORDER BY created_at DESC, id DESC"
+        if limit is not None:
+            sql += " LIMIT ? OFFSET ?"
+            params = (*params, limit, offset)
+        return await self._db.fetchall(sql, params)
 
     async def update_status(
         self, run_id: str, status: str, updated_at: str, error: str | None = None

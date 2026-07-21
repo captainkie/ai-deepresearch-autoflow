@@ -88,6 +88,7 @@ class ConfigService:
             },
             "require_plan_approval": bool(require),
             "verification_level": stored.get("verification_level") or "light",
+            "demo_mode": self._app.demo_mode,
         }
 
     async def update(self, patch: dict[str, Any]) -> dict[str, Any]:

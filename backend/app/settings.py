@@ -32,6 +32,21 @@ class AppSettings(BaseSettings):
     default_require_plan_approval: bool = True
     # In-process rate limiting on auth endpoints (disable in tests).
     rate_limit_enabled: bool = True
+    # Public demo hardening: force mock providers, and refuse credential entry /
+    # provider switching so nobody can run up cost or paste a real API key.
+    demo_mode: bool = False
+    # Optional: on an ephemeral-DB demo (e.g. Render free), seed this superadmin
+    # on startup when the DB has zero users, so the demo isn't stuck on /setup
+    # after every restart. Both must be set to seed; tests leave them unset.
+    demo_admin_email: str | None = None
+    demo_admin_password: str | None = None
+    # Optional published admin-role account for the demo: its credentials are shown
+    # to visitors so they can explore the admin panel without the private superadmin.
+    demo_public_admin_email: str | None = None
+    demo_public_admin_password: str | None = None
+    # Shared secret for the demo-only ``/demo/reset`` endpoint (a scheduled job
+    # calls it to wipe the ephemeral demo DB). Unset ⇒ reset is refused.
+    demo_reset_token: str | None = None
 
     # --- security (M3) ---
     # ``APP_ENV`` is intentionally un-prefixed (shared convention); the vault KEK

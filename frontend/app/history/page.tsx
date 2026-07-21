@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { RefreshCw, Plus, Compass, WifiOff } from "lucide-react";
+import { RefreshCw, Plus, Compass, WifiOff, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,17 +20,26 @@ import type { RunSummary } from "@/lib/types";
 
 type LoadState = "loading" | "ready" | "error";
 
+const PAGE_SIZE = 24;
+
 export default function HistoryPage() {
   const [runs, setRuns] = React.useState<RunSummary[]>([]);
   const [state, setState] = React.useState<LoadState>("loading");
   const [refreshing, setRefreshing] = React.useState(false);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const [hasMore, setHasMore] = React.useState(false);
 
-  const load = React.useCallback(async (isRefresh = false) => {
+  // Fetch the first page (used by the initial load, retry, and refresh).
+  const loadFirstPage = React.useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
     else setState("loading");
     try {
-      const data = await listRuns();
-      setRuns(data);
+      const { runs: page, hasMore: more } = await listRuns({
+        limit: PAGE_SIZE,
+        offset: 0,
+      });
+      setRuns(page);
+      setHasMore(more);
       setState("ready");
     } catch {
       setState("error");
@@ -39,14 +48,34 @@ export default function HistoryPage() {
     }
   }, []);
 
+  // Append the next page, keyed off how many we already have.
+  const loadMore = React.useCallback(async () => {
+    setLoadingMore(true);
+    try {
+      const { runs: page, hasMore: more } = await listRuns({
+        limit: PAGE_SIZE,
+        offset: runs.length,
+      });
+      // De-dupe by run_id in case a new run shifted the window between fetches.
+      setRuns((prev) => {
+        const seen = new Set(prev.map((r) => r.run_id));
+        return [...prev, ...page.filter((r) => !seen.has(r.run_id))];
+      });
+      setHasMore(more);
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [runs.length]);
+
   // Initial load — setState happens in the async callback (initial state is
   // already "loading"), avoiding a synchronous setState in the effect body.
   React.useEffect(() => {
     let active = true;
-    listRuns()
-      .then((data) => {
+    listRuns({ limit: PAGE_SIZE, offset: 0 })
+      .then(({ runs: page, hasMore: more }) => {
         if (active) {
-          setRuns(data);
+          setRuns(page);
+          setHasMore(more);
           setState("ready");
         }
       })
@@ -75,7 +104,7 @@ export default function HistoryPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => load(true)}
+            onClick={() => loadFirstPage(true)}
             disabled={refreshing || state === "loading"}
             className="gap-1.5"
           >
@@ -124,7 +153,12 @@ export default function HistoryPage() {
               </EmptyDescription>
             </EmptyHeader>
             <EmptyContent>
-              <Button variant="outline" size="sm" onClick={() => load()} className="gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => loadFirstPage()}
+                className="gap-1.5"
+              >
                 <RefreshCw className="size-3.5" data-icon="inline-start" />
                 Try again
               </Button>
@@ -156,11 +190,32 @@ export default function HistoryPage() {
         )}
 
         {state === "ready" && runs.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {runs.map((run) => (
-              <RunCard key={run.run_id} run={run} />
-            ))}
-          </div>
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {runs.map((run) => (
+                <RunCard key={run.run_id} run={run} />
+              ))}
+            </div>
+
+            {hasMore && (
+              <div className="mt-8 flex justify-center">
+                <Button
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="gap-1.5"
+                >
+                  {loadingMore ? (
+                    <Loader2
+                      className="size-4 animate-spin"
+                      data-icon="inline-start"
+                    />
+                  ) : null}
+                  {loadingMore ? "Loading…" : "Load more"}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

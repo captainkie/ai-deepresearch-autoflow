@@ -1,0 +1,139 @@
+"""Public-demo hardening: AUTOFLOW_DEMO_MODE forces mock providers and refuses
+credential entry / provider switching so a shared demo can't run up cost or
+capture a real API key.
+"""
+
+from __future__ import annotations
+
+import httpx
+import pytest
+from httpx import ASGITransport
+
+from app.main import _shutdown, _startup, create_app
+from app.settings import AppSettings
+
+
+@pytest.fixture
+async def demo_client():
+    settings = AppSettings(
+        db_path=":memory:",
+        cors_origins=["http://localhost:3000"],
+        rate_limit_enabled=False,
+        demo_mode=True,
+    )
+    app = create_app()
+    await _startup(app, settings)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
+        resp = await client.post(
+            "/api/v1/setup",
+            json={"email": "root@example.com", "name": "Root", "password": "supersecret1"},
+        )
+        client.headers["Authorization"] = f"Bearer {resp.json()['access_token']}"
+        yield client
+    await _shutdown(app)
+
+
+async def test_demo_flag_is_exposed(demo_client):
+    assert (await demo_client.get("/api/v1/health")).json()["demo_mode"] is True
+    assert (await demo_client.get("/api/v1/config")).json()["demo_mode"] is True
+
+
+async def test_demo_forbids_email_register(demo_client):
+    # Email/password sign-up is disabled in the demo (Google-only); the frontend
+    # hides the form, and the backend refuses it as defense in depth.
+    resp = await demo_client.post(
+        "/api/v1/auth/register",
+        json={"email": "new@x.com", "name": "New User", "password": "supersecret1"},
+    )
+    assert resp.status_code == 403
+
+
+async def test_demo_public_admin_is_seeded_as_admin_role():
+    # A published admin-role account lets visitors explore the admin panel without
+    # exposing the private superadmin. Seeded only when its env vars are set.
+    settings = AppSettings(
+        db_path=":memory:",
+        cors_origins=["http://localhost:3000"],
+        rate_limit_enabled=False,
+        demo_mode=True,
+        demo_admin_email="demo@example.com",
+        demo_admin_password="DemoPass2026",
+        demo_public_admin_email="try-admin@example.com",
+        demo_public_admin_password="TryAdmin2026",
+    )
+    app = create_app()
+    await _startup(app, settings)
+    try:
+        transport = ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
+            login = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "try-admin@example.com", "password": "TryAdmin2026"},
+            )
+            assert login.status_code == 200
+            assert login.json()["user"]["role"] == "admin"
+            # The private superadmin is still seeded alongside it.
+            su = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "demo@example.com", "password": "DemoPass2026"},
+            )
+            assert su.json()["user"]["role"] == "superadmin"
+    finally:
+        await _shutdown(app)
+
+
+async def test_demo_forbids_credential_entry_and_provider_switch(demo_client):
+    cred = await demo_client.post(
+        "/api/v1/admin/credentials",
+        json={"provider": "anthropic", "label": "x", "secret": "sk-real"},
+    )
+    assert cred.status_code == 403
+
+    rotate = await demo_client.post(
+        "/api/v1/admin/credentials/rotate", json={"new_master_key": "x" * 44}
+    )
+    assert rotate.status_code == 403
+
+    cfg = await demo_client.post("/api/v1/config", json={"llm_provider": "anthropic"})
+    assert cfg.status_code == 403
+
+
+async def test_demo_forces_mock_providers_on_a_run(demo_client):
+    # Even if the caller asks for a real provider, the run is pinned to mock.
+    resp = await demo_client.post(
+        "/api/v1/runs",
+        json={
+            "query": "brand X",
+            "config": {"llm_provider": "anthropic", "search_provider": "tavily"},
+            "require_plan_approval": False,
+        },
+    )
+    run_id = resp.json()["run_id"]
+    detail = (await demo_client.get(f"/api/v1/runs/{run_id}")).json()
+    assert detail["config"]["llm_provider"] == "mock"
+    assert detail["config"]["search_provider"] == "mock"
+
+
+async def test_demo_admin_is_seeded_when_env_set():
+    # An ephemeral-DB demo seeds a superadmin so it isn't stuck on /setup.
+    settings = AppSettings(
+        db_path=":memory:",
+        cors_origins=["http://localhost:3000"],
+        rate_limit_enabled=False,
+        demo_mode=True,
+        demo_admin_email="demo@example.com",
+        demo_admin_password="DemoPass2026",
+    )
+    app = create_app()
+    await _startup(app, settings)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
+        assert (await client.get("/api/v1/setup/status")).json()["needs_setup"] is False
+        login = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "demo@example.com", "password": "DemoPass2026"},
+        )
+        assert login.status_code == 200
+        assert login.json()["user"]["role"] == "superadmin"
+    await _shutdown(app)

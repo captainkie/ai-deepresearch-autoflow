@@ -4,44 +4,61 @@ import * as React from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import { AuthShell } from "@/components/auth/auth-shell";
-import { GoogleIcon } from "@/components/icons/google";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { useAuth } from "@/components/auth-provider";
-import { googleStartUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { loginSchema, type LoginValues } from "@/lib/schemas";
+import { DEMO_ADMIN } from "@/lib/demo";
+import { useDemoMode } from "@/lib/use-demo-mode";
+
+// The hosted demo runs on a free tier that sleeps when idle; the first request
+// then cold-starts (tens of seconds). If a sign-in takes longer than this, we
+// surface a "waking the server" notice so the wait doesn't look like a bug.
+const WAKE_NOTICE_AFTER_MS = 3500;
 
 export default function LoginPage() {
   const { login } = useAuth();
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
+  const demo = useDemoMode();
+  const [waking, setWaking] = React.useState(false);
+  const form = useForm<LoginValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (busy) return;
-    setBusy(true);
+  async function onSubmit(values: LoginValues) {
+    setWaking(false);
+    const wakeTimer = setTimeout(() => setWaking(true), WAKE_NOTICE_AFTER_MS);
     try {
-      await login(email, password);
+      await login(values.email, values.password);
       // AuthProvider redirects to "/" on success.
     } catch (err) {
-      setBusy(false);
       toast.error("Sign in failed", {
-        description: err instanceof Error ? err.message : "Check your email and password.",
+        description:
+          err instanceof Error ? err.message : "Check your email and password.",
       });
+    } finally {
+      clearTimeout(wakeTimer);
+      setWaking(false);
     }
   }
 
-  async function onGoogle() {
-    try {
-      window.location.href = await googleStartUrl();
-    } catch {
-      toast.error("Google sign-in unavailable", {
-        description: "It isn't configured on this server.",
-      });
-    }
+  async function loginAsDemoAdmin() {
+    form.setValue("email", DEMO_ADMIN.email);
+    form.setValue("password", DEMO_ADMIN.password);
+    await form.handleSubmit(onSubmit)();
   }
 
   return (
@@ -51,56 +68,103 @@ export default function LoginPage() {
       footer={
         <>
           No account?{" "}
-          <Link href="/register" className="font-medium text-primary hover:underline">
+          <Link
+            href="/register"
+            className="font-medium text-primary hover:underline"
+          >
             Create one
           </Link>
         </>
       }
     >
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+      <Form {...form}>
+        <form
+          onSubmit={form.handleSubmit(onSubmit)}
+          className="space-y-4"
+          noValidate
+        >
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input type="email" autoComplete="email" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+          <FormField
+            control={form.control}
+            name="password"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl>
+                  <Input
+                    type="password"
+                    autoComplete="current-password"
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
           />
+          <Button
+            type="submit"
+            disabled={form.formState.isSubmitting}
+            className="h-10 w-full gap-2"
+          >
+            {form.formState.isSubmitting ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : null}
+            Sign in
+          </Button>
+        </form>
+      </Form>
+
+      {/* Only when a request is slow (cold start), and never on a fast self-host
+          (demo === false) where a slow sign-in wouldn't be a sleeping server. */}
+      {waking && demo !== false ? (
+        <p
+          role="status"
+          className="mt-3 flex items-center justify-center gap-2 rounded-md bg-muted/50 px-3 py-2 text-center text-xs text-muted-foreground ring-1 ring-inset ring-border"
+        >
+          <Loader2 className="size-3.5 shrink-0 animate-spin" />
+          Waking up the demo server — the free host sleeps when idle, so the first
+          sign-in can take up to a minute. Hang tight…
+        </p>
+      ) : null}
+
+      <GoogleSignInButton />
+
+      {demo ? (
+        // A shared, published admin-role login so demo visitors can explore the
+        // admin panel + credentials screen. Safe: mock-only, rate-limited, and the
+        // demo DB is reset on a schedule. See lib/demo.ts.
+        <div className="mt-4 rounded-md bg-muted/50 p-3 text-sm ring-1 ring-inset ring-border">
+          <p className="font-medium text-foreground">Explore as a demo admin</p>
+          <p className="mt-1 text-muted-foreground">
+            See the admin panel — users, audit log, and the credentials screen
+            (key entry is disabled in the demo).
+          </p>
+          <p className="mt-2 font-mono text-xs break-all text-muted-foreground">
+            {DEMO_ADMIN.email} · {DEMO_ADMIN.password}
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={loginAsDemoAdmin}
+            disabled={form.formState.isSubmitting}
+            className="mt-2 h-9 w-full"
+          >
+            Log in as demo admin
+          </Button>
         </div>
-        <Button type="submit" disabled={busy} className="h-10 w-full gap-2">
-          {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-          Sign in
-        </Button>
-      </form>
-
-      <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
-        or
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        onClick={onGoogle}
-        className="h-10 w-full gap-2"
-      >
-        <GoogleIcon className="size-4" />
-        Continue with Google
-      </Button>
+      ) : null}
     </AuthShell>
   );
 }

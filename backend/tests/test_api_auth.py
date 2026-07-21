@@ -65,3 +65,44 @@ async def test_duplicate_registration_conflicts(client):
     body = {"email": "dup@example.com", "name": "Dup", "password": "password1"}
     assert (await client.post("/api/v1/auth/register", json=body)).status_code == 201
     assert (await client.post("/api/v1/auth/register", json=body)).status_code == 409
+
+
+# --- Input validation (Pydantic: EmailStr + shared password/name constraints) --- #
+
+
+async def test_setup_validates_email_and_password(client):
+    # A malformed email is rejected at the schema boundary (422), not stored.
+    bad_email = await client.post(
+        "/api/v1/setup",
+        json={"email": "not-an-email", "name": "Boss", "password": "supersecret1"},
+    )
+    assert bad_email.status_code == 422
+    # A password shorter than 8 chars is rejected.
+    short_pw = await client.post(
+        "/api/v1/setup",
+        json={"email": "boss@example.com", "name": "Boss", "password": "short"},
+    )
+    assert short_pw.status_code == 422
+    # Still in setup mode — neither invalid request created a user.
+    assert (await client.get("/api/v1/setup/status")).json()["needs_setup"] is True
+
+
+async def test_register_validates_email_password_and_name(client):
+    await _bootstrap(client)
+    invalid = [
+        {"email": "bad", "name": "X", "password": "password1"},  # bad email
+        {"email": "x@example.com", "name": "X", "password": "short"},  # short pw
+        {"email": "y@example.com", "name": "   ", "password": "password1"},  # blank name
+    ]
+    for body in invalid:
+        resp = await client.post("/api/v1/auth/register", json=body)
+        assert resp.status_code == 422, body
+
+
+async def test_login_rejects_malformed_email(client):
+    await _bootstrap(client)
+    # A non-email is a schema error (422), distinct from wrong credentials (401).
+    resp = await client.post(
+        "/api/v1/auth/login", json={"email": "notanemail", "password": "supersecret1"}
+    )
+    assert resp.status_code == 422

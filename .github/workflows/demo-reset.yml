@@ -1,0 +1,42 @@
+name: Reset demo database
+
+# The hosted demo (autoflow-research.fosivo.com) runs on an ephemeral database.
+# This scheduled job wipes accumulated test accounts / runs so the shared demo
+# stays clean and spam-resistant. It calls a token-guarded, demo-only endpoint
+# that also re-seeds the demo accounts.
+#
+# NOTE: `schedule` triggers only run on the repository's DEFAULT branch, so this
+# workflow takes effect once the branch is merged to main. Until then, run it by
+# hand from the Actions tab (workflow_dispatch).
+#
+# Requires repository secret DEMO_RESET_TOKEN to match AUTOFLOW_DEMO_RESET_TOKEN
+# on the Render service.
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # weekly — Mondays 03:00 UTC
+  workflow_dispatch: {}
+
+concurrency:
+  group: demo-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the demo reset endpoint
+        env:
+          RESET_TOKEN: ${{ secrets.DEMO_RESET_TOKEN }}
+        run: |
+          if [ -z "$RESET_TOKEN" ]; then
+            echo "::warning::DEMO_RESET_TOKEN is not set — skipping demo reset."
+            exit 0
+          fi
+          code=$(curl -sS --max-time 60 -o /tmp/reset_body -w "%{http_code}" -X POST \
+            "https://api.autoflow-research.fosivo.com/api/v1/demo/reset" \
+            -H "X-Demo-Reset-Token: $RESET_TOKEN")
+          echo "HTTP $code"
+          cat /tmp/reset_body || true
+          echo
+          test "$code" = "200"

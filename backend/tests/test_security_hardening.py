@@ -54,6 +54,41 @@ async def test_login_is_rate_limited(rl_client):
     assert codes.count(401) <= 10
 
 
+async def test_rate_limit_keys_on_forwarded_for(rl_client):
+    # Behind a proxy (Render), the socket peer is the proxy — every client would
+    # share one bucket. Keying on X-Forwarded-For gives each real client its own.
+    creds = {"email": "nobody@x.com", "password": "wrong-guess"}
+    last = None
+    for _ in range(11):  # exhaust the 10/window budget for 1.1.1.1
+        last = await rl_client.post(
+            "/api/v1/auth/login", json=creds, headers={"X-Forwarded-For": "1.1.1.1"}
+        )
+    assert last.status_code == 429
+    # A different forwarded client still has its own budget (not throttled).
+    other = await rl_client.post(
+        "/api/v1/auth/login", json=creds, headers={"X-Forwarded-For": "2.2.2.2"}
+    )
+    assert other.status_code == 401
+
+
+async def test_create_run_is_rate_limited(rl_client):
+    setup = await rl_client.post(
+        "/api/v1/setup",
+        json={"email": "root@example.com", "name": "Root", "password": "supersecret1"},
+    )
+    headers = {"Authorization": f"Bearer {setup.json()['access_token']}"}
+    codes = []
+    for _ in range(12):
+        resp = await rl_client.post(
+            "/api/v1/runs",
+            json={"query": "brand X", "require_plan_approval": False},
+            headers=headers,
+        )
+        codes.append(resp.status_code)
+    # A handful of runs/window are allowed, then run creation is throttled.
+    assert 429 in codes
+
+
 # --- login timing / enumeration ------------------------------------------ #
 
 

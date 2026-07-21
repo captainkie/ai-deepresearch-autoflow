@@ -1,31 +1,40 @@
 "use client";
 
-import * as React from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 
 import { AuthShell } from "@/components/auth/auth-shell";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { registerSchema, type RegisterValues } from "@/lib/schemas";
+import { useDemoMode } from "@/lib/use-demo-mode";
 
 export default function RegisterPage() {
   const { register } = useAuth();
-  const [name, setName] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [busy, setBusy] = React.useState(false);
+  const demo = useDemoMode();
+  const form = useForm<RegisterValues>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: { name: "", email: "", password: "" },
+  });
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (busy) return;
-    setBusy(true);
+  async function onSubmit(values: RegisterValues) {
     try {
-      await register({ name, email, password });
+      await register(values);
     } catch (err) {
-      setBusy(false);
       toast.error("Couldn't create account", {
         description: err instanceof Error ? err.message : "Please try again.",
       });
@@ -39,52 +48,93 @@ export default function RegisterPage() {
       footer={
         <>
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-primary hover:underline">
+          <Link
+            href="/login"
+            className="font-medium text-primary hover:underline"
+          >
             Sign in
           </Link>
         </>
       }
     >
-      <form onSubmit={onSubmit} className="space-y-4">
-        <div className="space-y-1.5">
-          <Label htmlFor="name">Name</Label>
-          <Input
-            id="name"
-            autoComplete="name"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
+      {demo ? (
+        // Email sign-up is disabled in the demo (Google-only) to keep bots from
+        // creating throwaway accounts; the backend also refuses /auth/register.
+        <div className="space-y-4">
+          <p className="rounded-md bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground ring-1 ring-inset ring-border">
+            Email sign-up is disabled in the live demo. Continue with Google to
+            explore the app as a member.
+          </p>
+          <GoogleSignInButton label="Continue with Google" />
         </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="email">Email</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <p className="text-xs text-muted-foreground">At least 8 characters.</p>
-        </div>
-        <Button type="submit" disabled={busy} className="h-10 w-full gap-2">
-          {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-          Create account
-        </Button>
-      </form>
+      ) : (
+        <>
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4"
+              noValidate
+            >
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input autoComplete="name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" autoComplete="email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        autoComplete="new-password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>At least 8 characters.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="h-10 w-full gap-2"
+              >
+                {form.formState.isSubmitting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                Create account
+              </Button>
+            </form>
+          </Form>
+
+          <GoogleSignInButton label="Sign up with Google" />
+        </>
+      )}
     </AuthShell>
   );
 }

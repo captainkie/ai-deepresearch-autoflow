@@ -19,11 +19,19 @@ from app.settings import AppSettings
 @pytest.fixture
 def app_settings() -> AppSettings:
     return AppSettings(
+        # Isolate tests from the developer's backend/.env (e.g. real GOOGLE_* keys)
+        # so results don't depend on local secrets.
+        _env_file=None,
         db_path=":memory:",
         cors_origins=["http://localhost:3000"],
         default_language="en",
         default_require_plan_approval=True,
         rate_limit_enabled=False,
+        # Force OAuth unconfigured regardless of any GOOGLE_* in the environment,
+        # so google-config tests are deterministic.
+        google_client_id=None,
+        google_client_secret=None,
+        google_redirect_uri=None,
     )
 
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.api import API_V1
-from app.api.deps import get_config_service
+from app.api.deps import forbid_in_demo, get_config_service
 from app.api.schemas_api import (
     ConfigResponse,
     ConfigUpdate,
@@ -45,7 +45,7 @@ async def get_config(svc: ConfigService = Depends(get_config_service)) -> Config
     return ConfigResponse(**await svc.current())
 
 
-@router.post("/config", dependencies=[Depends(require_admin)])
+@router.post("/config", dependencies=[Depends(require_admin), Depends(forbid_in_demo)])
 async def update_config(
     patch: ConfigUpdate, svc: ConfigService = Depends(get_config_service)
 ) -> ConfigResponse:

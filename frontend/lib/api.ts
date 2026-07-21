@@ -95,7 +95,9 @@ async function request<T>(path: string, opts: RequestOptions = {}): Promise<T> {
 
 // --- Health -------------------------------------------------------------
 export function getHealth() {
-  return request<{ status: string; version: string }>("/api/v1/health");
+  return request<{ status: string; version: string; demo_mode?: boolean }>(
+    "/api/v1/health",
+  );
 }
 
 // --- Auth & setup -------------------------------------------------------
@@ -181,9 +183,17 @@ export function createRun(body: CreateRun): Promise<{ run_id: string }> {
   });
 }
 
-export async function listRuns(): Promise<RunSummary[]> {
-  const data = await request<{ runs: RunSummary[] }>("/api/v1/runs");
-  return data.runs ?? [];
+export async function listRuns(
+  opts: { limit?: number; offset?: number } = {},
+): Promise<{ runs: RunSummary[]; hasMore: boolean }> {
+  const params = new URLSearchParams();
+  if (opts.limit != null) params.set("limit", String(opts.limit));
+  if (opts.offset != null) params.set("offset", String(opts.offset));
+  const qs = params.toString();
+  const data = await request<{ runs: RunSummary[]; has_more?: boolean }>(
+    `/api/v1/runs${qs ? `?${qs}` : ""}`,
+  );
+  return { runs: data.runs ?? [], hasMore: !!data.has_more };
 }
 
 export function getRun(runId: string): Promise<RunDetail> {

@@ -19,6 +19,7 @@ from app.__about__ import APP_NAME, VERSION
 from app.api import admin as admin_router
 from app.api import auth as auth_router
 from app.api import config as config_router
+from app.api import demo as demo_router
 from app.api import health as health_router
 from app.api import runs as runs_router
 from app.api import setup as setup_router
@@ -28,6 +29,7 @@ from app.security.crypto import Vault
 from app.security.keys import resolve_jwt_secret, resolve_master_key
 from app.services.auth_service import AuthService
 from app.services.config_service import ConfigService
+from app.services.demo import seed_demo_users
 from app.services.oauth_service import GoogleOAuthService
 from app.services.run_service import RunService
 from app.services.vault_service import VaultService
@@ -69,6 +71,8 @@ async def _startup(app: FastAPI, settings: AppSettings) -> None:
     app.state.config_service = config_service
     app.state.run_service = RunService(db, config_service, settings, vault=vault_service)
 
+    await seed_demo_users(db, auth_service, settings)
+
 
 async def _shutdown(app: FastAPI) -> None:
     await app.state.run_service.aclose()
@@ -102,4 +106,5 @@ def create_app() -> FastAPI:
     app.include_router(config_router.router)
     app.include_router(runs_router.router)
     app.include_router(admin_router.router)
+    app.include_router(demo_router.router)
     return app

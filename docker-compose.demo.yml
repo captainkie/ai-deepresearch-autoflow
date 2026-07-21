@@ -1,0 +1,21 @@
+# Demo overlay — turns the dev stack into a SAFE public demo.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d
+#
+# AUTOFLOW_DEMO_MODE makes the backend force mock providers on every run and
+# refuse credential entry / provider switching, so a shared demo can't run up
+# cost or capture a real API key. The frontend shows a "Live demo" banner.
+#
+# This overlay is for running the demo LOCALLY. The permanent public demo runs
+# on Vercel (frontend) + Render (backend) — see docs/DEMO.md.
+services:
+  backend:
+    environment:
+      AUTOFLOW_DEMO_MODE: "true"
+      # Isolate the demo behind its own DB so a public demo never exposes the
+      # developer's real accounts / run history (the base stack uses m4demo.db).
+      AUTOFLOW_DB_PATH: /data/demo.db
+
+  frontend:
+    environment:
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
