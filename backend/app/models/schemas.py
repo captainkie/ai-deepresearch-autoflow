@@ -173,6 +173,9 @@ class RunConfig(BaseModel):
     # Engine v2 verifier (empty ⇒ reuse the main llm_provider/llm_model).
     verifier_provider: str = ""
     verifier_model: str = ""
+    # off ⇒ legacy summarize path (no claim/verification events); light|strict ⇒
+    # claim extraction + verification.
+    verification_level: str = "light"
     max_sections: int = 6
     max_iters_per_section: int = 2
     results_per_query: int = 6
