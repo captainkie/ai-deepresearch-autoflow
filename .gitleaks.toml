@@ -1,0 +1,20 @@
+# gitleaks configuration — extends the default ruleset and allowlists the
+# obvious test fixtures / example files (no real secrets live in the repo;
+# real keys go in gitignored .env or the encrypted vault).
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures, example env, and docs are not real secrets"
+paths = [
+  '''backend/tests/.*''',
+  '''.*\.env\.example$''',
+  '''docs/.*''',
+]
+regexes = [
+  '''sk-ant-(DEMOSECRET|SUPERSECRET)[A-Za-z0-9-]*''',
+  '''sk-secret-[A-Za-z0-9-]*''',
+  '''sk-ant-DEMOSECRET-abcdefghijklmnop''',
+  '''supersecret1''',
+]
