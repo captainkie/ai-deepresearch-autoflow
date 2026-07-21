@@ -69,3 +69,27 @@ async def test_demo_forces_mock_providers_on_a_run(demo_client):
     detail = (await demo_client.get(f"/api/v1/runs/{run_id}")).json()
     assert detail["config"]["llm_provider"] == "mock"
     assert detail["config"]["search_provider"] == "mock"
+
+
+async def test_demo_admin_is_seeded_when_env_set():
+    # An ephemeral-DB demo seeds a superadmin so it isn't stuck on /setup.
+    settings = AppSettings(
+        db_path=":memory:",
+        cors_origins=["http://localhost:3000"],
+        rate_limit_enabled=False,
+        demo_mode=True,
+        demo_admin_email="demo@example.com",
+        demo_admin_password="DemoPass2026",
+    )
+    app = create_app()
+    await _startup(app, settings)
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
+        assert (await client.get("/api/v1/setup/status")).json()["needs_setup"] is False
+        login = await client.post(
+            "/api/v1/auth/login",
+            json={"email": "demo@example.com", "password": "DemoPass2026"},
+        )
+        assert login.status_code == 200
+        assert login.json()["user"]["role"] == "superadmin"
+    await _shutdown(app)

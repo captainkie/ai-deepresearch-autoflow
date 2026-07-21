@@ -60,8 +60,19 @@ async def google_client():
     await _shutdown(app)
 
 
-async def test_google_start_503_when_unconfigured(client):
-    assert (await client.get("/api/v1/auth/google/start")).status_code == 503
+async def test_google_start_503_when_unconfigured():
+    # Self-contained + force oauth off, so it's immune to any GOOGLE_* the
+    # developer has in backend/.env / the environment.
+    settings = AppSettings(
+        _env_file=None, db_path=":memory:", cors_origins=["http://localhost:3000"]
+    )
+    app = create_app()
+    await _startup(app, settings)
+    app.state.oauth_service = None
+    transport = ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as client:
+        assert (await client.get("/api/v1/auth/google/start")).status_code == 503
+    await _shutdown(app)
 
 
 async def test_google_login_end_to_end(google_client):

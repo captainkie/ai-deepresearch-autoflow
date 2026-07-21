@@ -35,6 +35,11 @@ class AppSettings(BaseSettings):
     # Public demo hardening: force mock providers, and refuse credential entry /
     # provider switching so nobody can run up cost or paste a real API key.
     demo_mode: bool = False
+    # Optional: on an ephemeral-DB demo (e.g. Render free), seed this superadmin
+    # on startup when the DB has zero users, so the demo isn't stuck on /setup
+    # after every restart. Both must be set to seed; tests leave them unset.
+    demo_admin_email: str | None = None
+    demo_admin_password: str | None = None
 
     # --- security (M3) ---
     # ``APP_ENV`` is intentionally un-prefixed (shared convention); the vault KEK

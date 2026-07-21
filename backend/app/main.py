@@ -69,6 +69,23 @@ async def _startup(app: FastAPI, settings: AppSettings) -> None:
     app.state.config_service = config_service
     app.state.run_service = RunService(db, config_service, settings, vault=vault_service)
 
+    await _seed_demo_admin(db, auth_service, settings)
+
+
+async def _seed_demo_admin(db: Database, auth_service: AuthService, settings: AppSettings) -> None:
+    """Seed a superadmin on an ephemeral-DB demo so it isn't stuck on /setup after
+    a restart. No-op unless both demo-admin env vars are set and the DB is empty."""
+    if not (settings.demo_admin_email and settings.demo_admin_password):
+        return
+    if await UserRepo(db).list():
+        return
+    await auth_service.register(
+        email=settings.demo_admin_email,
+        name="Demo Admin",
+        password=settings.demo_admin_password,
+        role="superadmin",
+    )
+
 
 async def _shutdown(app: FastAPI) -> None:
     await app.state.run_service.aclose()
