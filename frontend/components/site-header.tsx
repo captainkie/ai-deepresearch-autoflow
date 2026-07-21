@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, History, Settings, Plus, LogOut } from "lucide-react";
+import { Compass, History, Settings, Plus, LogOut, Shield } from "lucide-react";
 
 import { BrandLockup } from "@/components/brand";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -29,6 +29,7 @@ export function SiteHeader() {
   // The header only appears once you're signed in; auth screens stand alone.
   if (status !== "authenticated" || !user) return null;
 
+  const isAdmin = user.role === "admin" || user.role === "superadmin";
   const isActive = (href: string, exact?: boolean) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
 
@@ -63,6 +64,21 @@ export function SiteHeader() {
               </Link>
             );
           })}
+          {isAdmin ? (
+            <Link
+              href="/admin"
+              aria-current={isActive("/admin") ? "page" : undefined}
+              className={cn(
+                "relative inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors",
+                isActive("/admin")
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              <Shield className="size-4" />
+              <span className="hidden sm:inline">Admin</span>
+            </Link>
+          ) : null}
         </nav>
 
         <div className="flex items-center gap-1">

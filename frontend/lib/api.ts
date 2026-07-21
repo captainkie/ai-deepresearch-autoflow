@@ -13,9 +13,13 @@ import {
   setAccessToken,
 } from "./auth";
 import type {
+  About,
+  AuditEntry,
   ConfigResponse,
   ConfigUpdate,
   CreateRun,
+  Credential,
+  Role,
   RunDetail,
   RunSummary,
   Session,
@@ -201,6 +205,67 @@ export function cancelRun(runId: string): Promise<{ ok: boolean }> {
     `/api/runs/${encodeURIComponent(runId)}/cancel`,
     { method: "POST" },
   );
+}
+
+// --- Admin: users -------------------------------------------------------
+export async function listUsers(): Promise<User[]> {
+  const data = await request<{ users: User[] }>("/api/admin/users");
+  return data.users ?? [];
+}
+
+export function updateUser(
+  userId: string,
+  body: { role?: Role; disabled?: boolean },
+): Promise<User> {
+  return request<User>(`/api/admin/users/${encodeURIComponent(userId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+// --- Admin: credentials -------------------------------------------------
+export async function listCredentials(): Promise<Credential[]> {
+  const data = await request<{ credentials: Credential[] }>("/api/admin/credentials");
+  return data.credentials ?? [];
+}
+
+export function createCredential(body: {
+  provider: string;
+  label: string;
+  secret: string;
+  expires_at?: string | null;
+}): Promise<Credential> {
+  return request<Credential>("/api/admin/credentials", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
+}
+
+export function revokeCredential(id: string): Promise<{ ok: boolean }> {
+  return request<{ ok: boolean }>(
+    `/api/admin/credentials/${encodeURIComponent(id)}/revoke`,
+    { method: "POST" },
+  );
+}
+
+export function rotateMasterKey(
+  newMasterKey: string,
+): Promise<{ ok: boolean; key_version: number }> {
+  return request<{ ok: boolean; key_version: number }>("/api/admin/credentials/rotate", {
+    method: "POST",
+    body: JSON.stringify({ new_master_key: newMasterKey }),
+  });
+}
+
+// --- Admin: audit -------------------------------------------------------
+export async function listAudit(limit = 100): Promise<AuditEntry[]> {
+  const data = await request<{ audit: AuditEntry[] }>(`/api/admin/audit?limit=${limit}`);
+  return data.audit ?? [];
+}
+
+// --- About --------------------------------------------------------------
+export function getAbout(): Promise<About> {
+  return request<About>("/api/about");
 }
 
 // --- SSE ----------------------------------------------------------------
