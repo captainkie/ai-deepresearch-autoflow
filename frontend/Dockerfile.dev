@@ -1,0 +1,28 @@
+# syntax=docker/dockerfile:1
+# Dev image for the Next.js frontend — hot reload via `next dev`.
+# docker-compose bind-mounts the source over /app; node_modules and .next live
+# in named volumes so the bind mount never shadows them.
+FROM node:22-slim
+
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    # Polling watchers — reliable HMR over a macOS bind mount.
+    WATCHPACK_POLLING=true \
+    CHOKIDAR_USEPOLLING=true
+
+# Pin pnpm via corepack (package.json carries no packageManager field).
+RUN corepack enable && corepack prepare pnpm@11.5.2 --activate
+
+WORKDIR /app
+
+# Install dependencies first so this layer is cached until the lockfile changes.
+# pnpm-workspace.yaml is REQUIRED here: pnpm v11 reads overrides / settings
+# (postcss CVE pin, onlyBuiltDependencies: sharp) from it, not from package.json.
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+# Fallback copy for a standalone `docker run`; compose bind-mounts over this.
+COPY . .
+
+EXPOSE 3000
+CMD ["pnpm", "exec", "next", "dev", "--hostname", "0.0.0.0", "--port", "3000"]

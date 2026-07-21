@@ -1,7 +1,9 @@
 # AutoFlow Research — API Contract
 
 Shared contract between the Python (FastAPI) backend and the Next.js frontend.
-Base URL (dev): `http://localhost:8000`. All JSON. SSE endpoints use `text/event-stream`.
+Base URL (dev): `http://localhost:8000`. All endpoints are versioned under `/api/v1`
+(bump the `API_V1` prefix in `backend/app/api/__init__.py` for a new version). All JSON.
+SSE endpoints use `text/event-stream`.
 
 ## Concepts
 
@@ -14,10 +16,10 @@ Base URL (dev): `http://localhost:8000`. All JSON. SSE endpoints use `text/event
 
 ## REST endpoints
 
-### `GET /api/health`
+### `GET /api/v1/health`
 `200 → { "status": "ok", "version": "..." }`
 
-### `GET /api/templates`
+### `GET /api/v1/templates`
 List research templates. `200 → { "templates": Template[] }`
 ```ts
 type Template = {
@@ -29,7 +31,7 @@ type Template = {
 }
 ```
 
-### `GET /api/config`
+### `GET /api/v1/config`
 Current provider config + which providers are available (have credentials).
 ```ts
 type ConfigResponse = {
@@ -39,11 +41,11 @@ type ConfigResponse = {
 }
 ```
 
-### `POST /api/config`
+### `POST /api/v1/config`
 Update runtime config (does not persist secrets to disk; keys come from env).
 Body: `Partial<{ llm_provider, llm_model, search_provider, require_plan_approval }>` → `ConfigResponse`.
 
-### `POST /api/runs`
+### `POST /api/v1/runs`
 Create a run. Body:
 ```ts
 type CreateRun = {
@@ -55,26 +57,28 @@ type CreateRun = {
 ```
 `201 → { "run_id": string }`
 
-### `GET /api/runs`
+### `GET /api/v1/runs`
 `200 → { "runs": RunSummary[] }` (newest first)
 ```ts
 type RunSummary = { run_id: string; query: string; template: string; status: string; created_at: string; title?: string }
 ```
 
-### `GET /api/runs/{run_id}`
-`200 → RunDetail` — full run incl. `plan`, `sections`, `report` (Markdown), `sources`, `status`.
+### `GET /api/v1/runs/{run_id}`
+`200 → RunDetail` — full run incl. `plan`, `sections`, `report` (Markdown), `sources`, `status`,
+and (Engine v2) `confidence_summary?: ConfidenceSummary` recovered from the stored `report` event
+so a reloaded finished run shows its trust badge without a live stream.
 
-### `POST /api/runs/{run_id}/plan`
+### `POST /api/v1/runs/{run_id}/plan`
 Approve or replace the plan (only valid while `awaiting_plan`).
 Body: `{ "sections": PlanSection[] }` (edited) or `{ "approve": true }` to accept as-is.
 `200 → { "ok": true }` — resumes the run; new events flow on the open SSE stream.
 
-### `POST /api/runs/{run_id}/cancel`
+### `POST /api/v1/runs/{run_id}/cancel`
 `200 → { "ok": true }`
 
 ## SSE endpoint
 
-### `GET /api/runs/{run_id}/stream`  (`text/event-stream`)
+### `GET /api/v1/runs/{run_id}/stream`  (`text/event-stream`)
 Opens the live event stream for a run. The server starts (or resumes) execution and emits
 events until `done` or `error`. If the client reconnects, the server replays buffered events
 first (each event has a monotonic `seq`), so the UI can rebuild state.
@@ -144,42 +148,42 @@ type AuditEntry = {
 }
 ```
 
-- `GET /api/admin/credentials?provider=` → `{ credentials: Credential[] }` (newest first)
-- `POST /api/admin/credentials` — body `{ provider, label, secret, expires_at? }` → `201 Credential`
-- `POST /api/admin/credentials/{id}/revoke` → `{ ok: true }` (`404` if unknown)
-- `DELETE /api/admin/credentials/{id}` → `{ ok: true }` (soft-delete = revoke)
-- `POST /api/admin/credentials/rotate` — body `{ new_master_key }` (base64, 32 bytes) →
+- `GET /api/v1/admin/credentials?provider=` → `{ credentials: Credential[] }` (newest first)
+- `POST /api/v1/admin/credentials` — body `{ provider, label, secret, expires_at? }` → `201 Credential`
+- `POST /api/v1/admin/credentials/{id}/revoke` → `{ ok: true }` (`404` if unknown)
+- `DELETE /api/v1/admin/credentials/{id}` → `{ ok: true }` (soft-delete = revoke)
+- `POST /api/v1/admin/credentials/rotate` — body `{ new_master_key }` (base64, 32 bytes) →
   `{ ok: true, key_version }` (`400` on a bad key). Re-encrypts all credentials under the new KEK.
-- `GET /api/admin/audit?limit=` → `{ audit: AuditEntry[] }` (newest first)
+- `GET /api/v1/admin/audit?limit=` → `{ audit: AuditEntry[] }` (newest first)
 
 ## Auth, setup & users (M3b)
 
 Sessions: login/register/refresh return `{ user: User, access_token: string }` in the body and set
 a rotating **refresh** token as an httpOnly cookie. Send the access token as `Authorization: Bearer
-<access_token>`; call `POST /api/auth/refresh` (uses the cookie) to get a new one. Roles:
+<access_token>`; call `POST /api/v1/auth/refresh` (uses the cookie) to get a new one. Roles:
 `viewer < member < admin < superadmin`.
 
 ```ts
 type User = { id: string; email: string; name: string; role: string; disabled: boolean; created_at: string }
 ```
 
-- **Setup** (first-run) — `GET /api/setup/status` → `{ needs_setup: boolean }`;
-  `POST /api/setup` — body `{ email, name, password }` → `201 { user, access_token }` (first user is
+- **Setup** (first-run) — `GET /api/v1/setup/status` → `{ needs_setup: boolean }`;
+  `POST /api/v1/setup` — body `{ email, name, password }` → `201 { user, access_token }` (first user is
   `superadmin`; `409` if any user already exists).
-- **Auth** — `POST /api/auth/register` `{ email, name, password }` → `201` (creates a `member`) ·
-  `POST /api/auth/login` `{ email, password }` → `200` (`401` on bad creds) ·
-  `POST /api/auth/refresh` → `200` (rotates; `401` if missing/invalid) ·
-  `POST /api/auth/logout` → `{ ok: true }` · `GET /api/auth/me` → `User` (needs Bearer).
-- **Google OAuth** (enabled only when configured, else `503`) — `GET /api/auth/google/start` →
-  `{ auth_url }` (+ sets a short-lived PKCE/state cookie); `GET /api/auth/google/callback?code&state`
+- **Auth** — `POST /api/v1/auth/register` `{ email, name, password }` → `201` (creates a `member`) ·
+  `POST /api/v1/auth/login` `{ email, password }` → `200` (`401` on bad creds) ·
+  `POST /api/v1/auth/refresh` → `200` (rotates; `401` if missing/invalid) ·
+  `POST /api/v1/auth/logout` → `{ ok: true }` · `GET /api/v1/auth/me` → `User` (needs Bearer).
+- **Google OAuth** (enabled only when configured, else `503`) — `GET /api/v1/auth/google/start` →
+  `{ auth_url }` (+ sets a short-lived PKCE/state cookie); `GET /api/v1/auth/google/callback?code&state`
   validates state, requires a verified email, links/creates a `member`, sets the refresh cookie, and
   `302`-redirects to `AUTOFLOW_FRONTEND_URL`.
-- **Admin users** — `GET /api/admin/users` → `{ users: User[] }` (admin+) ·
-  `PATCH /api/admin/users/{id}` `{ role?, disabled? }` → `User` (admin manages members/viewers;
+- **Admin users** — `GET /api/v1/admin/users` → `{ users: User[] }` (admin+) ·
+  `PATCH /api/v1/admin/users/{id}` `{ role?, disabled? }` → `User` (admin manages members/viewers;
   only a **superadmin** may grant/modify `admin`+ or disable an admin).
 
 **Auth on existing routes:** run routes require a logged-in user (create/plan/cancel need `member+`;
-a member only sees/manages their own runs, others 404). `POST /api/config` and all `/api/admin/*`
-require `admin+`; master-key rotation requires `superadmin`. `GET /api/templates`, `GET /api/config`,
-`/api/health`, `/api/about`, `/api/setup/*`, and `/api/auth/*` are open.
+a member only sees/manages their own runs, others 404). `POST /api/v1/config` and all `/api/v1/admin/*`
+require `admin+`; master-key rotation requires `superadmin`. `GET /api/v1/templates`, `GET /api/v1/config`,
+`/api/v1/health`, `/api/v1/about`, `/api/v1/setup/*`, and `/api/v1/auth/*` are open.
 ```

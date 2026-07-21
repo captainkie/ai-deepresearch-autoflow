@@ -22,7 +22,7 @@ _MOCK = {"llm_provider": "mock", "search_provider": "mock", "crawl_provider": "m
 
 async def _drain_stream(auth_client, run_id: str, events: list[dict]) -> None:
     """Read the stream until the server closes it (no terminal-type shortcut)."""
-    async with auth_client.stream("GET", f"/api/runs/{run_id}/stream") as resp:
+    async with auth_client.stream("GET", f"/api/v1/runs/{run_id}/stream") as resp:
         assert resp.status_code == 200
         async for line in resp.aiter_lines():
             if not line.startswith("data:"):
@@ -34,7 +34,7 @@ async def _drain_stream(auth_client, run_id: str, events: list[dict]) -> None:
 
 async def _wait_for_status(auth_client, run_id: str, target: str, tries=250, delay=0.02):
     for _ in range(tries):
-        detail = (await auth_client.get(f"/api/runs/{run_id}")).json()
+        detail = (await auth_client.get(f"/api/v1/runs/{run_id}")).json()
         if detail["status"] == target:
             return detail
         await asyncio.sleep(delay)
@@ -43,7 +43,7 @@ async def _wait_for_status(auth_client, run_id: str, target: str, tries=250, del
 
 async def _create(auth_client, *, require_plan_approval: bool) -> str:
     resp = await auth_client.post(
-        "/api/runs",
+        "/api/v1/runs",
         json={
             "query": "brand X",
             "config": _MOCK,
@@ -60,13 +60,13 @@ async def test_cancel_awaiting_plan_emits_terminal_cancelled(auth_client):
     reader = asyncio.create_task(_drain_stream(auth_client, run_id, events))
 
     await _wait_for_status(auth_client, run_id, "awaiting_plan")
-    resp = await auth_client.post(f"/api/runs/{run_id}/cancel")
+    resp = await auth_client.post(f"/api/v1/runs/{run_id}/cancel")
     assert resp.status_code == 200
 
     # The server closes the stream on cancel, so the reader completes.
     await asyncio.wait_for(reader, timeout=5)
 
-    detail = (await auth_client.get(f"/api/runs/{run_id}")).json()
+    detail = (await auth_client.get(f"/api/v1/runs/{run_id}")).json()
     assert detail["status"] == "cancelled"
 
     cancelled = [
@@ -80,7 +80,7 @@ async def test_cancel_terminal_event_is_replayed_on_reconnect(auth_client):
     first: list[dict] = []
     reader = asyncio.create_task(_drain_stream(auth_client, run_id, first))
     await _wait_for_status(auth_client, run_id, "awaiting_plan")
-    await auth_client.post(f"/api/runs/{run_id}/cancel")
+    await auth_client.post(f"/api/v1/runs/{run_id}/cancel")
     await asyncio.wait_for(reader, timeout=5)
 
     # A fresh subscriber replays the persisted history; the LAST event it sees
@@ -96,16 +96,16 @@ async def test_cancel_finished_run_is_noop(auth_client):
     run_id = await _create(auth_client, require_plan_approval=False)
     events: list[dict] = []
     await asyncio.wait_for(_drain_stream(auth_client, run_id, events), timeout=5)
-    assert (await auth_client.get(f"/api/runs/{run_id}")).json()["status"] == "done"
+    assert (await auth_client.get(f"/api/v1/runs/{run_id}")).json()["status"] == "done"
 
-    resp = await auth_client.post(f"/api/runs/{run_id}/cancel")
+    resp = await auth_client.post(f"/api/v1/runs/{run_id}/cancel")
     assert resp.status_code == 200
     # A completed run must not be flipped to cancelled.
-    assert (await auth_client.get(f"/api/runs/{run_id}")).json()["status"] == "done"
+    assert (await auth_client.get(f"/api/v1/runs/{run_id}")).json()["status"] == "done"
 
 
 async def test_cancel_unknown_run_404(auth_client):
-    resp = await auth_client.post("/api/runs/nope/cancel")
+    resp = await auth_client.post("/api/v1/runs/nope/cancel")
     assert resp.status_code == 404
 
 
@@ -116,8 +116,8 @@ async def test_submit_plan_after_cancel_conflicts(auth_client):
     events: list[dict] = []
     reader = asyncio.create_task(_drain_stream(auth_client, run_id, events))
     await _wait_for_status(auth_client, run_id, "awaiting_plan")
-    await auth_client.post(f"/api/runs/{run_id}/cancel")
+    await auth_client.post(f"/api/v1/runs/{run_id}/cancel")
     await asyncio.wait_for(reader, timeout=5)
 
-    resp = await auth_client.post(f"/api/runs/{run_id}/plan", json={"approve": True})
+    resp = await auth_client.post(f"/api/v1/runs/{run_id}/plan", json={"approve": True})
     assert resp.status_code == 409

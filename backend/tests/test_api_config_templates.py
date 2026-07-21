@@ -55,7 +55,7 @@ async def test_current_and_update_roundtrip(config_service):
 
 
 async def test_templates_endpoint(client):
-    resp = await client.get("/api/templates")
+    resp = await client.get("/api/v1/templates")
     assert resp.status_code == 200
     templates = resp.json()["templates"]
     assert len(templates) >= 3
@@ -65,8 +65,25 @@ async def test_templates_endpoint(client):
         assert {"id", "name", "description", "audience"} <= t.keys()
 
 
+async def test_templates_endpoint_exposes_entity_metadata(client):
+    resp = await client.get("/api/v1/templates")
+    assert resp.status_code == 200
+    templates = {t["id"]: t for t in resp.json()["templates"]}
+
+    # An entity-mode template exposes its comparison schema + verification level.
+    comp = templates["competitor_brand"]
+    assert comp["entity_mode"] is True
+    assert comp["entity_schema"]
+    assert all({"key", "label", "type"} <= f.keys() for f in comp["entity_schema"])
+    assert comp["verification_level"] in {"off", "light", "strict"}
+
+    # A plain narrative template reports entity_mode false + an empty schema.
+    assert templates["deep_research"]["entity_mode"] is False
+    assert templates["deep_research"]["entity_schema"] == []
+
+
 async def test_get_config_endpoint(auth_client):
-    resp = await auth_client.get("/api/config")
+    resp = await auth_client.get("/api/v1/config")
     assert resp.status_code == 200
     body = resp.json()
     assert "mock" in body["llm"]["available"]
@@ -76,24 +93,24 @@ async def test_get_config_endpoint(auth_client):
 
 async def test_get_config_requires_auth(client):
     # Config reveals which providers are wired up — gate it behind a session.
-    resp = await client.get("/api/config")
+    resp = await client.get("/api/v1/config")
     assert resp.status_code == 401
 
 
 async def test_post_config_persists(auth_client):
-    resp = await auth_client.post("/api/config", json={"search_provider": "duckduckgo"})
+    resp = await auth_client.post("/api/v1/config", json={"search_provider": "duckduckgo"})
     assert resp.status_code == 200
     assert resp.json()["search"]["provider"] == "duckduckgo"
 
 
 async def test_config_exposes_and_updates_verification_level(auth_client):
-    body = (await auth_client.get("/api/config")).json()
+    body = (await auth_client.get("/api/v1/config")).json()
     assert body["verification_level"] == "light"  # default
 
-    updated = await auth_client.post("/api/config", json={"verification_level": "strict"})
+    updated = await auth_client.post("/api/v1/config", json={"verification_level": "strict"})
     assert updated.status_code == 200
     assert updated.json()["verification_level"] == "strict"
 
     # Persisted across requests.
-    resp2 = await auth_client.get("/api/config")
+    resp2 = await auth_client.get("/api/v1/config")
     assert resp2.json()["verification_level"] == "strict"

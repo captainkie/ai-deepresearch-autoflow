@@ -7,7 +7,7 @@ _MOCK_CONFIG = {"llm_provider": "mock", "search_provider": "mock", "crawl_provid
 
 async def _create_run(auth_client):
     resp = await auth_client.post(
-        "/api/runs",
+        "/api/v1/runs",
         json={"query": "replay me", "config": _MOCK_CONFIG, "require_plan_approval": False},
     )
     assert resp.status_code == 201, resp.text

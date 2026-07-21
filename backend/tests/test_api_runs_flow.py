@@ -12,7 +12,7 @@ async def _create_run(auth_client, **body):
         "require_plan_approval": False,
     }
     payload.update(body)
-    resp = await auth_client.post("/api/runs", json=payload)
+    resp = await auth_client.post("/api/v1/runs", json=payload)
     assert resp.status_code == 201, resp.text
     return resp.json()["run_id"]
 
@@ -56,7 +56,7 @@ async def test_detail_after_completion(auth_client):
     run_id = await _create_run(auth_client)
     await collect_stream(auth_client, run_id)
 
-    detail = (await auth_client.get(f"/api/runs/{run_id}")).json()
+    detail = (await auth_client.get(f"/api/v1/runs/{run_id}")).json()
     assert detail["status"] == "done"
     assert detail["report"] and "## Sources" in detail["report"]
     assert detail["title"]
@@ -70,11 +70,11 @@ async def test_detail_after_completion(auth_client):
 async def test_list_runs_newest_first(auth_client):
     first = await _create_run(auth_client, query="first topic")
     second = await _create_run(auth_client, query="second topic")
-    body = (await auth_client.get("/api/runs")).json()
+    body = (await auth_client.get("/api/v1/runs")).json()
     ids = [r["run_id"] for r in body["runs"]]
     assert ids.index(second) < ids.index(first)
 
 
 async def test_stream_unknown_run_404(auth_client):
-    resp = await auth_client.get("/api/runs/does-not-exist/stream")
+    resp = await auth_client.get("/api/v1/runs/does-not-exist/stream")
     assert resp.status_code == 404

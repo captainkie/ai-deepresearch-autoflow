@@ -16,6 +16,7 @@ an event.
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
 
 from app.core.claims import extract_claims
 from app.core.contradictions import detect_contradictions
@@ -24,6 +25,7 @@ from app.core.sources import SourceRegistry
 from app.core.verifier import verify_claims
 from app.models.schemas import (
     Claim,
+    Contradiction,
     EventType,
     PageContent,
     PlanSection,
@@ -37,6 +39,18 @@ from app.providers.json_utils import JSONParseError, extract_json
 from app.providers.llm.base import LLMProvider
 from app.providers.search.base import SearchProvider
 from app.prompts.researcher import compress_messages, reflect_messages, summarize_messages
+from app.prompts.templates import get_template
+
+
+@dataclass
+class SectionResult:
+    """What a section produced: the compressed note plus the raw claim graph so
+    the engine can project the verified claims into the final report."""
+
+    summary: str
+    claims: list[Claim] = field(default_factory=list)
+    verifications: list[Verification] = field(default_factory=list)
+    contradictions: list[Contradiction] = field(default_factory=list)
 
 
 class Researcher:
@@ -60,8 +74,17 @@ class Researcher:
         self._config = config
         self._fetch_sem = fetch_semaphore or asyncio.Semaphore(config.fetch_concurrency)
         self._verifier = verifier or llm
+        # For entity_mode templates, feed the comparison attributes into claim
+        # extraction so claims are tagged (entity, attribute) — the pivot the
+        # synthesizer needs for the comparison table.
+        template = get_template(config.template)
+        self._entity_schema: list[dict] | None = (
+            [{"key": f.key, "label": f.label} for f in template.entity_schema]
+            if template.entity_mode
+            else None
+        )
 
-    async def research(self, section: PlanSection) -> str:
+    async def research(self, section: PlanSection) -> SectionResult:
         await self._emitter.emit(
             EventType.section_start,
             {"section_id": section.id, "title": section.title},
@@ -72,7 +95,7 @@ class Researcher:
 
     # --- legacy path (verification_level == off) --------------------------- #
 
-    async def _research_legacy(self, section: PlanSection) -> str:
+    async def _research_legacy(self, section: PlanSection) -> SectionResult:
         notes: list[str] = []
         seen_queries: set[str] = set()
         queries = list(section.queries) or [section.title]
@@ -90,7 +113,8 @@ class Researcher:
                 break
             queries = follow
 
-        return await self._finish_section(section, notes)
+        summary = await self._finish_section(section, notes)
+        return SectionResult(summary=summary)
 
     async def _run_queries(
         self,
@@ -130,7 +154,7 @@ class Researcher:
 
     # --- Engine v2 path (verification_level == light | strict) ------------- #
 
-    async def _research_v2(self, section: PlanSection) -> str:
+    async def _research_v2(self, section: PlanSection) -> SectionResult:
         emit = self._emitter.emit
         seen_queries: set[str] = set()
         queries = list(section.queries) or [section.title]
@@ -182,7 +206,10 @@ class Researcher:
                 notes.append(note)
                 await emit(EventType.note, {"section_id": section.id, "content": note})
 
-        return await self._finish_section(section, notes)
+        summary = await self._finish_section(section, notes)
+        return SectionResult(
+            summary=summary, claims=claims, verifications=verifs, contradictions=contradictions
+        )
 
     async def _run_queries_v2(
         self,
@@ -226,6 +253,7 @@ class Researcher:
                     goal=section.goal,
                     source_id=source.id,
                     section_id=section.id,
+                    entity_schema=self._entity_schema,
                 )
                 for claim in page_claims:
                     await emit(

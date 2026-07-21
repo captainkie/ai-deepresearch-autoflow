@@ -34,7 +34,7 @@ def _mock_google() -> GoogleOAuthService:
     return GoogleOAuthService(
         client_id="cid",
         client_secret="sec",
-        redirect_uri="http://localhost:8000/api/auth/google/callback",
+        redirect_uri="http://localhost:8000/api/v1/auth/google/callback",
         http=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
 
@@ -49,7 +49,7 @@ async def google_client():
     )
     settings.google_client_id = "cid"
     settings.google_client_secret = "sec"
-    settings.google_redirect_uri = "http://localhost:8000/api/auth/google/callback"
+    settings.google_redirect_uri = "http://localhost:8000/api/v1/auth/google/callback"
 
     app = create_app()
     await _startup(app, settings)
@@ -61,11 +61,11 @@ async def google_client():
 
 
 async def test_google_start_503_when_unconfigured(client):
-    assert (await client.get("/api/auth/google/start")).status_code == 503
+    assert (await client.get("/api/v1/auth/google/start")).status_code == 503
 
 
 async def test_google_login_end_to_end(google_client):
-    start = await google_client.get("/api/auth/google/start")
+    start = await google_client.get("/api/v1/auth/google/start")
     assert start.status_code == 200
     assert start.json()["auth_url"].startswith("https://accounts.google.com")
 
@@ -74,23 +74,23 @@ async def test_google_login_end_to_end(google_client):
     state = raw.split(":", 1)[0]
 
     callback = await google_client.get(
-        f"/api/auth/google/callback?code=abc&state={state}", follow_redirects=False
+        f"/api/v1/auth/google/callback?code=abc&state={state}", follow_redirects=False
     )
     assert callback.status_code == 302
 
     # Session established via the refresh cookie → mint an access token → /me works.
-    refreshed = await google_client.post("/api/auth/refresh")
+    refreshed = await google_client.post("/api/v1/auth/refresh")
     assert refreshed.status_code == 200
     access = refreshed.json()["access_token"]
-    me = await google_client.get("/api/auth/me", headers={"Authorization": f"Bearer {access}"})
+    me = await google_client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {access}"})
     assert me.status_code == 200
     assert me.json()["email"] == "oauth@example.com"
     assert me.json()["role"] == "member"
 
 
 async def test_google_callback_rejects_state_mismatch(google_client):
-    await google_client.get("/api/auth/google/start")
+    await google_client.get("/api/v1/auth/google/start")
     callback = await google_client.get(
-        "/api/auth/google/callback?code=abc&state=WRONG", follow_redirects=False
+        "/api/v1/auth/google/callback?code=abc&state=WRONG", follow_redirects=False
     )
     assert callback.status_code == 400

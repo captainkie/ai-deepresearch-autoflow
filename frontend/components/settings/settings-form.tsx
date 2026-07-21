@@ -48,7 +48,11 @@ import {
   EmptyContent,
 } from "@/components/ui/empty";
 import { getConfig, updateConfig } from "@/lib/api";
-import type { ConfigResponse, ConfigUpdate } from "@/lib/types";
+import type {
+  ConfigResponse,
+  ConfigUpdate,
+  VerificationLevel,
+} from "@/lib/types";
 import {
   LLM_PROVIDERS,
   SEARCH_PROVIDERS,
@@ -75,6 +79,7 @@ type FormState = {
   llm_model: string;
   search_provider: string;
   require_plan_approval: boolean;
+  verification_level: VerificationLevel;
 };
 
 function toForm(c: ConfigResponse): FormState {
@@ -83,8 +88,19 @@ function toForm(c: ConfigResponse): FormState {
     llm_model: c.llm.model ?? "",
     search_provider: c.search.provider ?? "",
     require_plan_approval: c.require_plan_approval,
+    verification_level: c.verification_level ?? "light",
   };
 }
+
+const VERIFICATION_LEVELS: {
+  value: VerificationLevel;
+  label: string;
+  hint: string;
+}[] = [
+  { value: "off", label: "Off", hint: "Legacy — summarize sources, no claim checks" },
+  { value: "light", label: "Light", hint: "Extract & verify claims (recommended)" },
+  { value: "strict", label: "Strict", hint: "Verify claims and probe harder" },
+];
 
 function uniq(values: (string | undefined)[]): string[] {
   return Array.from(new Set(values.filter((v): v is string => !!v)));
@@ -149,6 +165,8 @@ export function SettingsForm() {
       payload.search_provider = form.search_provider;
     if (form.require_plan_approval !== base.require_plan_approval)
       payload.require_plan_approval = form.require_plan_approval;
+    if (form.verification_level !== base.verification_level)
+      payload.verification_level = form.verification_level;
 
     setSaving(true);
     try {
@@ -398,6 +416,38 @@ export function SettingsForm() {
                 setForm({ ...form, require_plan_approval: v })
               }
             />
+          </Field>
+
+          <Field orientation="responsive" className="border-t pt-5">
+            <FieldContent>
+              <FieldLabel htmlFor="verification-level">
+                Claim verification
+              </FieldLabel>
+              <FieldDescription>
+                How rigorously the engine grounds and checks each claim before it
+                reaches the report. Off falls back to plain summarization.
+              </FieldDescription>
+            </FieldContent>
+            <Select
+              value={form.verification_level}
+              onValueChange={(v) =>
+                setForm({ ...form, verification_level: v as VerificationLevel })
+              }
+            >
+              <SelectTrigger id="verification-level" className="sm:w-56">
+                <SelectValue placeholder="Select a level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {VERIFICATION_LEVELS.map((lv) => (
+                    <SelectItem key={lv.value} value={lv.value}>
+                      {lv.label}
+                      <span className="text-muted-foreground"> · {lv.hint}</span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </Field>
         </CardContent>
       </Card>

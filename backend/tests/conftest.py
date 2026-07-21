@@ -46,7 +46,7 @@ async def auth_client(client):
     token is set as a default header on the client.
     """
     resp = await client.post(
-        "/api/setup",
+        "/api/v1/setup",
         json={"email": "root@example.com", "name": "Root", "password": "supersecret1"},
     )
     client.headers["Authorization"] = f"Bearer {resp.json()['access_token']}"

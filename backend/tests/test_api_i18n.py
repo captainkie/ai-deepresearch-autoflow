@@ -15,7 +15,7 @@ _MOCK = {"llm_provider": "mock", "search_provider": "mock", "crawl_provider": "m
 
 
 async def _drain_stream(auth_client, run_id: str, events: list[dict]) -> None:
-    async with auth_client.stream("GET", f"/api/runs/{run_id}/stream") as resp:
+    async with auth_client.stream("GET", f"/api/v1/runs/{run_id}/stream") as resp:
         assert resp.status_code == 200
         async for line in resp.aiter_lines():
             if not line.startswith("data:"):
@@ -27,7 +27,7 @@ async def _drain_stream(auth_client, run_id: str, events: list[dict]) -> None:
 
 async def _run_to_completion(auth_client, *, language: str) -> dict:
     resp = await auth_client.post(
-        "/api/runs",
+        "/api/v1/runs",
         json={
             "query": "brand X",
             "language": language,
@@ -39,7 +39,7 @@ async def _run_to_completion(auth_client, *, language: str) -> dict:
     run_id = resp.json()["run_id"]
     events: list[dict] = []
     await asyncio.wait_for(_drain_stream(auth_client, run_id, events), timeout=5)
-    detail = (await auth_client.get(f"/api/runs/{run_id}")).json()
+    detail = (await auth_client.get(f"/api/v1/runs/{run_id}")).json()
     assert detail["status"] == "done", detail
     return detail
 

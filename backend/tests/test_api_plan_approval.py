@@ -20,7 +20,7 @@ _MOCK_CONFIG = {"llm_provider": "mock", "search_provider": "mock", "crawl_provid
 
 async def _create_run(auth_client):
     resp = await auth_client.post(
-        "/api/runs",
+        "/api/v1/runs",
         json={"query": "brand X", "config": _MOCK_CONFIG, "require_plan_approval": True},
     )
     assert resp.status_code == 201, resp.text
@@ -28,7 +28,7 @@ async def _create_run(auth_client):
 
 
 async def _collect_stream(auth_client, run_id, events):
-    async with auth_client.stream("GET", f"/api/runs/{run_id}/stream") as resp:
+    async with auth_client.stream("GET", f"/api/v1/runs/{run_id}/stream") as resp:
         assert resp.status_code == 200
         async for line in resp.aiter_lines():
             if not line.startswith("data:"):
@@ -43,7 +43,7 @@ async def _collect_stream(auth_client, run_id, events):
 
 async def _wait_for_status(auth_client, run_id, target, tries=250, delay=0.02):
     for _ in range(tries):
-        detail = (await auth_client.get(f"/api/runs/{run_id}")).json()
+        detail = (await auth_client.get(f"/api/v1/runs/{run_id}")).json()
         if detail["status"] == target:
             return detail
         await asyncio.sleep(delay)
@@ -57,7 +57,7 @@ async def test_awaiting_plan_then_approve_as_is(auth_client):
 
     await _wait_for_status(auth_client, run_id, "awaiting_plan")
 
-    resp = await auth_client.post(f"/api/runs/{run_id}/plan", json={"approve": True})
+    resp = await auth_client.post(f"/api/v1/runs/{run_id}/plan", json={"approve": True})
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
 
@@ -88,7 +88,7 @@ async def test_awaiting_plan_then_edit_sections(auth_client):
         }
     ]
 
-    resp = await auth_client.post(f"/api/runs/{run_id}/plan", json={"sections": edited})
+    resp = await auth_client.post(f"/api/v1/runs/{run_id}/plan", json={"sections": edited})
     assert resp.status_code == 200
 
     await asyncio.wait_for(reader, timeout=5)
@@ -96,7 +96,7 @@ async def test_awaiting_plan_then_edit_sections(auth_client):
     assert len(starts) == 1
     assert starts[0]["data"]["title"].startswith("EDITED")
 
-    final = (await auth_client.get(f"/api/runs/{run_id}")).json()
+    final = (await auth_client.get(f"/api/v1/runs/{run_id}")).json()
     assert final["status"] == "done"
     assert len(final["sections"]) == 1
     assert final["sections"][0]["title"].startswith("EDITED")
@@ -105,14 +105,14 @@ async def test_awaiting_plan_then_edit_sections(auth_client):
 async def test_plan_on_non_awaiting_run_conflicts(auth_client):
     # Auto-run (no approval required) never enters awaiting_plan.
     resp = await auth_client.post(
-        "/api/runs",
+        "/api/v1/runs",
         json={"query": "auto", "config": _MOCK_CONFIG, "require_plan_approval": False},
     )
     run_id = resp.json()["run_id"]
-    resp = await auth_client.post(f"/api/runs/{run_id}/plan", json={"approve": True})
+    resp = await auth_client.post(f"/api/v1/runs/{run_id}/plan", json={"approve": True})
     assert resp.status_code == 409
 
 
 async def test_plan_unknown_run_404(auth_client):
-    resp = await auth_client.post("/api/runs/nope/plan", json={"approve": True})
+    resp = await auth_client.post("/api/v1/runs/nope/plan", json={"approve": True})
     assert resp.status_code == 404

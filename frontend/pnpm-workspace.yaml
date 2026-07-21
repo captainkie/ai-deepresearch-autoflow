@@ -4,6 +4,9 @@ overrides:
   postcss: ">=8.5.10"
 minimumReleaseAgeExclude:
   - radix-ui@1.6.4
-onlyBuiltDependencies:
-  - sharp
-  - unrs-resolver
+# pnpm 11's default-deny build policy: only these native deps may run install
+# scripts. (Replaces the v10 `onlyBuiltDependencies` list, which 11.5.2 silently
+# ignores — leaving sharp unbuilt and failing frozen installs via strictDepBuilds.)
+allowBuilds:
+  sharp: true
+  unrs-resolver: true

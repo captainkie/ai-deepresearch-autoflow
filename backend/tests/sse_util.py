@@ -17,7 +17,7 @@ async def collect_stream(
 ) -> list[dict[str, Any]]:
     """Open the SSE stream and drain events until a terminal type (or cap)."""
     events: list[dict[str, Any]] = []
-    async with client.stream("GET", f"/api/runs/{run_id}/stream") as resp:
+    async with client.stream("GET", f"/api/v1/runs/{run_id}/stream") as resp:
         assert resp.status_code == 200
         async for line in resp.aiter_lines():
             if not line.startswith("data:"):

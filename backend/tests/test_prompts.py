@@ -22,6 +22,39 @@ def test_templates_present():
     assert get_template("unknown").id == "deep_research"
 
 
+def test_engine_v2_template_set_present():
+    # M3.5b ships the structured marketing set (Competitor Teardown maps to the
+    # existing competitor_brand key so older runs/tests keep working).
+    for key in (
+        "deep_research",
+        "competitor_brand",
+        "market_landscape",
+        "swot",
+        "pricing_analysis",
+    ):
+        assert key in TEMPLATES
+
+
+def test_templates_carry_entity_metadata():
+    from app.prompts.templates import EntityField
+
+    # A plain narrative template: no entity comparison.
+    dr = TEMPLATES["deep_research"]
+    assert dr.entity_mode is False
+    assert dr.entity_schema == ()
+
+    # An entity template pivots verified claims into a comparison table.
+    comp = TEMPLATES["competitor_brand"]
+    assert comp.entity_mode is True
+    assert len(comp.entity_schema) >= 2
+    assert all(isinstance(f, EntityField) for f in comp.entity_schema)
+    assert all(f.key and f.label and f.type in {"text", "list"} for f in comp.entity_schema)
+
+    # Every template declares a default verification level.
+    for t in TEMPLATES.values():
+        assert t.verification_level in {"off", "light", "strict"}
+
+
 def test_language_directive():
     from app.models.schemas import Language
 

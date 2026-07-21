@@ -1,0 +1,63 @@
+# Dev stack — `docker compose up` runs the whole app with hot reload.
+#   backend : FastAPI on :8000 (uvicorn --reload)
+#   frontend: Next.js on :3000 (next dev, HMR)
+# Source is bind-mounted; deps/build caches live in named volumes so host and
+# container never fight over node_modules / .venv / .next.
+name: ai-dpr-autoflow
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    # Provider keys + secrets come from the developer's existing backend/.env.
+    env_file:
+      - ./backend/.env
+    # These win over env_file: DB lives on a named volume, CORS allows the SPA.
+    environment:
+      APP_ENV: development
+      # The superadmin (narenrit@adyim.com) + run history live in m4demo.db;
+      # autoflow.db is a pre-auth schema with no users table.
+      AUTOFLOW_DB_PATH: /data/m4demo.db
+      AUTOFLOW_CORS_ORIGINS: http://localhost:3000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - backend_venv:/app/.venv
+      # Reuse the developer's existing SQLite DB (accounts + run history) rather
+      # than a throwaway volume, so the superadmin created at first-run setup and
+      # past runs survive `docker compose down`.
+      - ./backend/data:/data
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health').status==200 else 1)"
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    environment:
+      NODE_ENV: development
+      # Read by the browser — must point at the host-mapped backend port.
+      NEXT_PUBLIC_API_BASE: http://localhost:8000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+    depends_on:
+      - backend
+
+volumes:
+  backend_venv:
+  frontend_node_modules:
+  frontend_next:

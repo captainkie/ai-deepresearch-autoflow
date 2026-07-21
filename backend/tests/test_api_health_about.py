@@ -4,7 +4,7 @@ from app.__about__ import VERSION
 
 
 async def test_health_ok(client):
-    resp = await client.get("/api/health")
+    resp = await client.get("/api/v1/health")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
@@ -12,7 +12,7 @@ async def test_health_ok(client):
 
 
 async def test_about_credits(client):
-    resp = await client.get("/api/about")
+    resp = await client.get("/api/v1/about")
     assert resp.status_code == 200
     body = resp.json()
     assert body["license"] == "AGPL-3.0"

@@ -2,7 +2,7 @@
  * Client-side session state.
  *
  * The access token lives in memory only (never localStorage) — it's short-lived
- * and re-minted from the httpOnly refresh cookie via `POST /api/auth/refresh`.
+ * and re-minted from the httpOnly refresh cookie via `POST /api/v1/auth/refresh`.
  * `refreshAccessToken` is single-flight so a burst of 401s triggers one refresh.
  */
 import { API_BASE } from "./api";
@@ -33,7 +33,7 @@ export function refreshAccessToken(): Promise<boolean> {
   if (refreshInFlight) return refreshInFlight;
   const run = (async (): Promise<boolean> => {
     try {
-      const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+      const res = await fetch(`${API_BASE}/api/v1/auth/refresh`, {
         method: "POST",
         credentials: "include",
         cache: "no-store",

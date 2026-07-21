@@ -66,11 +66,21 @@ class ConfigUpdate(BaseModel):
     verification_level: str | None = None
 
 
+class EntityFieldOut(BaseModel):
+    key: str
+    label: str
+    type: str = "text"
+
+
 class TemplateOut(BaseModel):
     id: str
     name: str
     description: str
     audience: str
+    # Engine v2 (M3.5b): entity_mode templates carry a comparison schema.
+    entity_mode: bool = False
+    entity_schema: list[EntityFieldOut] = Field(default_factory=list)
+    verification_level: str = "light"
 
 
 class TemplatesResponse(BaseModel):
@@ -150,6 +160,13 @@ class RunProviders(BaseModel):
     crawl_provider: str | None = None
 
 
+class ConfidenceSummaryOut(BaseModel):
+    high: int = 0
+    medium: int = 0
+    low: int = 0
+    contradictions: int = 0
+
+
 class RunDetail(BaseModel):
     run_id: str
     query: str
@@ -163,6 +180,7 @@ class RunDetail(BaseModel):
     error: str | None = None
     created_at: str
     updated_at: str
+    confidence_summary: ConfidenceSummaryOut | None = None
     plan: PlanOut | None = None
     sections: list[SectionOut] = Field(default_factory=list)
     sources: list[SourceOut] = Field(default_factory=list)

@@ -33,7 +33,7 @@ def _service(*, token_status: int = 200, userinfo: dict | None = None) -> Google
     return GoogleOAuthService(
         client_id="cid",
         client_secret="secret",
-        redirect_uri="http://localhost:8000/api/auth/google/callback",
+        redirect_uri="http://localhost:8000/api/v1/auth/google/callback",
         http=http,
     )
 

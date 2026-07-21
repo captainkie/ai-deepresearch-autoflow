@@ -12,9 +12,9 @@ from collections.abc import Awaitable, Callable
 
 from app.core.events import EventEmitter, Sink
 from app.core.planner import Planner
-from app.core.researcher import Researcher
+from app.core.researcher import Researcher, SectionResult
 from app.core.sources import SourceRegistry
-from app.core.synthesizer import synthesize
+from app.core.synthesizer import summarize_confidence, synthesize
 from app.models.schemas import EventType, Plan, PlanSection, RunConfig, RunStatus
 from app.providers.crawl.base import CrawlProvider
 from app.providers.llm.base import LLMProvider
@@ -71,20 +71,37 @@ class ResearchEngine:
                 EventType.status,
                 {"stage": RunStatus.researching.value, "message": "Researching sections"},
             )
-            await self._research_all(sections, registry, emitter, config)
+            results = await self._research_all(sections, registry, emitter, config)
+            claims = [c for r in results for c in r.claims]
+            verifications = [v for r in results for v in r.verifications]
+            contradictions = [x for r in results for x in r.contradictions]
 
             await emit(
                 EventType.status,
                 {"stage": RunStatus.writing.value, "message": "Writing report"},
             )
             markdown, title = await synthesize(
-                plan.brief, sections, registry.all(), self._llm, emit, config
+                plan.brief,
+                sections,
+                registry.all(),
+                self._llm,
+                emit,
+                config,
+                claims=claims,
+                verifications=verifications,
+                contradictions=contradictions,
             )
-            await emit(EventType.report, {"markdown": markdown, "title": title})
-            await emit(
-                EventType.done,
-                {"title": title, "source_count": len(registry.all())},
+            # Attach the trust summary to report/done only when verification ran.
+            summary = (
+                summarize_confidence(claims, verifications, contradictions) if claims else None
             )
+            report_data = {"markdown": markdown, "title": title}
+            done_data = {"title": title, "source_count": len(registry.all())}
+            if summary is not None:
+                report_data["confidence_summary"] = summary
+                done_data["confidence_summary"] = summary
+            await emit(EventType.report, report_data)
+            await emit(EventType.done, done_data)
             return markdown
         except Exception as exc:  # noqa: BLE001 - surface any failure as an error event
             await emit(EventType.error, {"message": str(exc)})
@@ -96,7 +113,7 @@ class ResearchEngine:
         registry: SourceRegistry,
         emitter: EventEmitter,
         config: RunConfig,
-    ) -> None:
+    ) -> list[SectionResult]:
         fetch_sem = asyncio.Semaphore(config.fetch_concurrency)
         section_sem = asyncio.Semaphore(config.section_concurrency)
         researcher = Researcher(
@@ -109,9 +126,12 @@ class ResearchEngine:
             fetch_semaphore=fetch_sem,
         )
 
-        async def run_section(section: PlanSection) -> None:
+        # Collect by index so results keep plan order regardless of completion order.
+        results: list[SectionResult | None] = [None] * len(sections)
+
+        async def run_section(idx: int, section: PlanSection) -> None:
             async with section_sem:
-                await researcher.research(section)
+                results[idx] = await researcher.research(section)
 
         # TaskGroup (not gather) so the first section failure cancels its
         # siblings — otherwise orphaned section tasks keep emitting events onto
@@ -119,7 +139,9 @@ class ResearchEngine:
         # shutdown. Surface the original error (unwrapped) to run().
         try:
             async with asyncio.TaskGroup() as tg:
-                for section in sections:
-                    tg.create_task(run_section(section))
+                for idx, section in enumerate(sections):
+                    tg.create_task(run_section(idx, section))
         except* Exception as eg:
             raise eg.exceptions[0] from None
+
+        return [r for r in results if r is not None]

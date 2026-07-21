@@ -11,6 +11,7 @@ import aiosqlite
 from fastapi import APIRouter, Depends, HTTPException
 from sse_starlette.sse import EventSourceResponse
 
+from app.api import API_V1
 from app.api.deps import get_run_service
 from app.api.schemas_api import (
     CreateRun,
@@ -24,7 +25,7 @@ from app.api.schemas_api import (
 from app.security.rbac import ROLE_RANK, get_current_user, require_member
 from app.services.run_service import RunService
 
-router = APIRouter(prefix="/api", tags=["runs"])
+router = APIRouter(prefix=API_V1, tags=["runs"])
 
 
 def _is_admin(user: aiosqlite.Row) -> bool:
