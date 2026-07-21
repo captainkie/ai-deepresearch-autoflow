@@ -7,9 +7,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { AuthShell } from "@/components/auth/auth-shell";
-import { GoogleIcon } from "@/components/icons/google";
+import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 import { useAuth } from "@/components/auth-provider";
-import { googleStartUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,16 +36,6 @@ export default function LoginPage() {
       toast.error("Sign in failed", {
         description:
           err instanceof Error ? err.message : "Check your email and password.",
-      });
-    }
-  }
-
-  async function onGoogle() {
-    try {
-      window.location.href = await googleStartUrl();
-    } catch {
-      toast.error("Google sign-in unavailable", {
-        description: "It isn't configured on this server.",
       });
     }
   }
@@ -116,21 +105,7 @@ export default function LoginPage() {
         </form>
       </Form>
 
-      <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
-        or
-        <span className="h-px flex-1 bg-border" />
-      </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        onClick={onGoogle}
-        className="h-10 w-full gap-2"
-      >
-        <GoogleIcon className="size-4" />
-        Continue with Google
-      </Button>
+      <GoogleSignInButton />
     </AuthShell>
   );
 }

@@ -171,7 +171,8 @@ export function CredentialsPanel() {
                   <FormControl>
                     <select
                       {...field}
-                      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                      disabled={demo}
+                      className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm disabled:opacity-50"
                     >
                       {PROVIDERS.map((p) => (
                         <option key={p} value={p}>
@@ -191,7 +192,7 @@ export function CredentialsPanel() {
                 <FormItem>
                   <FormLabel className="text-xs">Label</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g. prod" {...field} />
+                    <Input placeholder="e.g. prod" disabled={demo} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -226,7 +227,7 @@ export function CredentialsPanel() {
                     <span className="text-muted-foreground">(optional)</span>
                   </FormLabel>
                   <FormControl>
-                    <Input type="date" className="h-8" {...field} />
+                    <Input type="date" className="h-8" disabled={demo} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -266,6 +267,7 @@ export function CredentialsPanel() {
               variant="outline"
               size="sm"
               className="h-8 gap-1.5"
+              disabled={demo}
               onClick={() => setPendingKey(generateMasterKey())}
             >
               <RefreshCw className="size-3.5" /> Rotate
