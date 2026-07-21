@@ -21,6 +21,7 @@ class _FixedLLM:
     def stream(self, messages, **kwargs):  # pragma: no cover - unused here
         raise NotImplementedError
 
+
 _PAGE = PageContent(
     url="https://example.com/brandx",
     title="BrandX",

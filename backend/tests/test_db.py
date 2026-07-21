@@ -3,9 +3,26 @@ from __future__ import annotations
 import pytest
 
 from app.db.database import Database
-from app.db.repositories import EventRepo, RunRepo, SettingsRepo
+from app.db.repositories import (
+    ClaimRepo,
+    ContradictionRepo,
+    EventRepo,
+    RunRepo,
+    SettingsRepo,
+    VerificationRepo,
+)
 
-_EXPECTED_TABLES = {"runs", "sections", "sources", "events", "settings"}
+_EXPECTED_TABLES = {
+    "runs",
+    "sections",
+    "sources",
+    "events",
+    "settings",
+    "claims",
+    "claim_sources",
+    "verifications",
+    "contradictions",
+}
 
 
 @pytest.fixture
@@ -116,3 +133,75 @@ async def test_settings_repo_roundtrip_json(db):
     everything = await settings.all()
     assert everything["llm_provider"] == "openai"
     assert everything["require_plan_approval"] is True
+
+
+# --- Engine v2 repos ------------------------------------------------------- #
+
+_TS = "2026-07-21T00:00:00+00:00"
+
+
+async def test_claim_repo_persists_claim_and_its_sources(db):
+    repo = ClaimRepo(db)
+    await repo.create(
+        "r1",
+        id="c1",
+        section_id="s1",
+        text="BrandX is priced at $9",
+        entity="BrandX",
+        attribute="pricing",
+        quote="priced at $9",
+        stance="neutral",
+        source_ids=[1, 2],
+        created_at=_TS,
+    )
+    rows = await repo.list_by_run("r1")
+    assert len(rows) == 1
+    assert rows[0]["entity"] == "BrandX"
+    assert rows[0]["section_id"] == "s1"
+    # m2m claim ↔ sources
+    assert await repo.source_ids("r1", "c1") == [1, 2]
+    assert await repo.list_by_run("other") == []
+
+
+async def test_verification_repo_upsert_is_one_per_claim(db):
+    repo = VerificationRepo(db)
+    await repo.upsert(
+        "r1",
+        claim_id="c1",
+        verdict="supported",
+        confidence=0.9,
+        rationale="ok",
+        verifier_model="mock-1",
+        created_at=_TS,
+    )
+    row = await repo.get("r1", "c1")
+    assert row["verdict"] == "supported"
+    # Re-verifying the same claim replaces (PK run_id, claim_id).
+    await repo.upsert(
+        "r1",
+        claim_id="c1",
+        verdict="partial",
+        confidence=0.4,
+        rationale="",
+        verifier_model=None,
+        created_at=_TS,
+    )
+    assert (await repo.get("r1", "c1"))["verdict"] == "partial"
+    assert len(await repo.list_by_run("r1")) == 1
+
+
+async def test_contradiction_repo_create_and_list(db):
+    repo = ContradictionRepo(db)
+    await repo.create(
+        "r1",
+        id="x1",
+        entity="BrandX",
+        attribute="pricing",
+        claim_id_a="c1",
+        claim_id_b="c2",
+        note="$9 vs $12",
+    )
+    rows = await repo.list_by_run("r1")
+    assert len(rows) == 1
+    assert {rows[0]["claim_id_a"], rows[0]["claim_id_b"]} == {"c1", "c2"}
+    assert rows[0]["attribute"] == "pricing"

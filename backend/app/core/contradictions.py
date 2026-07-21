@@ -37,9 +37,7 @@ async def detect_contradictions(
     out: list[Contradiction] = []
     for (entity, attribute), group in groups.items():
         for a, b in itertools.combinations(group, 2):
-            raw = await llm.complete(
-                contradiction_messages(a, b), tag="contradiction", json=True
-            )
+            raw = await llm.complete(contradiction_messages(a, b), tag="contradiction", json=True)
             try:
                 data = extract_json(raw)
             except JSONParseError:

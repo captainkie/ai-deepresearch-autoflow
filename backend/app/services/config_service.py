@@ -28,7 +28,14 @@ _KEYED_LLM = ("anthropic", "openai", "gemini", "zai", "moonshot")
 _KEYED_SEARCH = ("tavily", "serper", "exa")
 
 # Which settings keys ``update`` is allowed to write.
-_WRITABLE = ("llm_provider", "llm_model", "search_provider", "require_plan_approval")
+_WRITABLE = (
+    "llm_provider",
+    "llm_model",
+    "search_provider",
+    "require_plan_approval",
+    "verification_level",
+)
+_VERIFICATION_LEVELS = ("off", "light", "strict")
 
 
 def _trafilatura_available() -> bool:
@@ -80,6 +87,7 @@ class ConfigService:
                 "available": search_available,
             },
             "require_plan_approval": bool(require),
+            "verification_level": stored.get("verification_level") or "light",
         }
 
     async def update(self, patch: dict[str, Any]) -> dict[str, Any]:

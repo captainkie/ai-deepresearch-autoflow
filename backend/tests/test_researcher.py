@@ -26,9 +26,7 @@ class _ConstantSearch:
     """Returns the same three URLs for every query (so later rounds add 0 sources)."""
 
     async def search(self, query: str, n: int) -> list[SearchResult]:
-        return [
-            SearchResult(title=f"S{i}", url=f"https://example.com/const/{i}") for i in range(3)
-        ]
+        return [SearchResult(title=f"S{i}", url=f"https://example.com/const/{i}") for i in range(3)]
 
 
 class _KeepGoingLLM:

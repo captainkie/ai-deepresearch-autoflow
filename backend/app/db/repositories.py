@@ -436,3 +436,109 @@ class RefreshTokenRepo:
             "UPDATE refresh_tokens SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL",
             (revoked_at, user_id),
         )
+
+
+class ClaimRepo:
+    """Claims + their many-to-many link to sources (``claim_sources``)."""
+
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    async def create(
+        self,
+        run_id: str,
+        *,
+        id: str,
+        text: str,
+        source_ids: list[int],
+        quote: str = "",
+        section_id: str | None = None,
+        entity: str | None = None,
+        attribute: str | None = None,
+        stance: str | None = None,
+        created_at: str,
+    ) -> None:
+        await self._db.execute(
+            "INSERT OR REPLACE INTO claims "
+            "(run_id, id, section_id, text, entity, attribute, quote, stance, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (run_id, id, section_id, text, entity, attribute, quote, stance, created_at),
+        )
+        for ref_num in source_ids:
+            await self._db.execute(
+                "INSERT OR IGNORE INTO claim_sources (run_id, claim_id, ref_num) VALUES (?, ?, ?)",
+                (run_id, id, ref_num),
+            )
+
+    async def list_by_run(self, run_id: str) -> list[aiosqlite.Row]:
+        return await self._db.fetchall(
+            "SELECT * FROM claims WHERE run_id = ? ORDER BY created_at, id", (run_id,)
+        )
+
+    async def source_ids(self, run_id: str, claim_id: str) -> list[int]:
+        rows = await self._db.fetchall(
+            "SELECT ref_num FROM claim_sources WHERE run_id = ? AND claim_id = ? ORDER BY ref_num",
+            (run_id, claim_id),
+        )
+        return [int(r["ref_num"]) for r in rows]
+
+
+class VerificationRepo:
+    """One verification per claim (PK ``run_id, claim_id`` — re-verify upserts)."""
+
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    async def upsert(
+        self,
+        run_id: str,
+        *,
+        claim_id: str,
+        verdict: str,
+        confidence: float | None,
+        rationale: str = "",
+        verifier_model: str | None = None,
+        created_at: str,
+    ) -> None:
+        await self._db.execute(
+            "INSERT OR REPLACE INTO verifications "
+            "(run_id, claim_id, verdict, confidence, rationale, verifier_model, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (run_id, claim_id, verdict, confidence, rationale, verifier_model, created_at),
+        )
+
+    async def get(self, run_id: str, claim_id: str) -> aiosqlite.Row | None:
+        return await self._db.fetchone(
+            "SELECT * FROM verifications WHERE run_id = ? AND claim_id = ?", (run_id, claim_id)
+        )
+
+    async def list_by_run(self, run_id: str) -> list[aiosqlite.Row]:
+        return await self._db.fetchall("SELECT * FROM verifications WHERE run_id = ?", (run_id,))
+
+
+class ContradictionRepo:
+    def __init__(self, db: Database) -> None:
+        self._db = db
+
+    async def create(
+        self,
+        run_id: str,
+        *,
+        id: str,
+        claim_id_a: str,
+        claim_id_b: str,
+        entity: str | None = None,
+        attribute: str | None = None,
+        note: str = "",
+    ) -> None:
+        await self._db.execute(
+            "INSERT OR REPLACE INTO contradictions "
+            "(run_id, id, entity, attribute, claim_id_a, claim_id_b, note) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (run_id, id, entity, attribute, claim_id_a, claim_id_b, note),
+        )
+
+    async def list_by_run(self, run_id: str) -> list[aiosqlite.Row]:
+        return await self._db.fetchall(
+            "SELECT * FROM contradictions WHERE run_id = ? ORDER BY id", (run_id,)
+        )
