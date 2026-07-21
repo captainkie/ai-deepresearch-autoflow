@@ -46,7 +46,10 @@ jobs:
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
         with:
-          version: 11
+          # Pinned to the version that wrote the lockfile and reads
+          # onlyBuiltDependencies from pnpm-workspace.yaml (so sharp / unrs-resolver
+          # build instead of tripping ERR_PNPM_IGNORED_BUILDS in CI).
+          version: 11.5.2
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
