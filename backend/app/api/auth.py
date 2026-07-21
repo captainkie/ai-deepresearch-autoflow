@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from app.api import API_V1
 from app.api.schemas_api import EmailField, NameField, PasswordField
 from app.api.cookies import REFRESH_COOKIE, clear_refresh_cookie, set_refresh_cookie
-from app.api.deps import get_app_settings, get_auth_service, get_oauth_service
+from app.api.deps import forbid_in_demo, get_app_settings, get_auth_service, get_oauth_service
 from app.security.ratelimit import rate_limit
 from app.security.rbac import get_current_user
 from app.services.auth_service import AuthService, EmailExistsError
@@ -54,7 +54,7 @@ async def _session_response(
 @router.post(
     "/register",
     status_code=status.HTTP_201_CREATED,
-    dependencies=[Depends(rate_limit(5, 60.0, "register"))],
+    dependencies=[Depends(rate_limit(5, 60.0, "register")), Depends(forbid_in_demo)],
 )
 async def register(
     body: RegisterRequest,

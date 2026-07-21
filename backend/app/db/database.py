@@ -76,6 +76,24 @@ class Database:
         finally:
             await cursor.close()
 
+    async def wipe_all(self) -> None:
+        """Delete every row from all user tables, leaving the schema intact.
+
+        Used by the demo reset endpoint to clear the ephemeral demo DB. Table names
+        come from ``sqlite_master`` (never user input), so interpolating them is safe.
+        """
+        rows = await self.fetchall(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+        )
+        conn = self.connection
+        await conn.execute("PRAGMA foreign_keys = OFF")
+        try:
+            for row in rows:
+                await conn.execute(f'DELETE FROM "{row["name"]}"')
+        finally:
+            await conn.execute("PRAGMA foreign_keys = ON")
+        await conn.commit()
+
     async def close(self) -> None:
         if self._conn is not None:
             await self._conn.close()

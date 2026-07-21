@@ -40,6 +40,13 @@ class AppSettings(BaseSettings):
     # after every restart. Both must be set to seed; tests leave them unset.
     demo_admin_email: str | None = None
     demo_admin_password: str | None = None
+    # Optional published admin-role account for the demo: its credentials are shown
+    # to visitors so they can explore the admin panel without the private superadmin.
+    demo_public_admin_email: str | None = None
+    demo_public_admin_password: str | None = None
+    # Shared secret for the demo-only ``/demo/reset`` endpoint (a scheduled job
+    # calls it to wipe the ephemeral demo DB). Unset ⇒ reset is refused.
+    demo_reset_token: str | None = None
 
     # --- security (M3) ---
     # ``APP_ENV`` is intentionally un-prefixed (shared convention); the vault KEK

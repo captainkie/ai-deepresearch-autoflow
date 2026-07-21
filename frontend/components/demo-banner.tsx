@@ -1,9 +1,8 @@
 "use client";
 
-import * as React from "react";
 import { FlaskConical } from "lucide-react";
 
-import { getHealth } from "@/lib/api";
+import { useDemoMode } from "@/lib/use-demo-mode";
 
 /**
  * A sticky warning shown only when the backend reports `demo_mode`. It tells
@@ -12,21 +11,7 @@ import { getHealth } from "@/lib/api";
  * half of that safety contract.
  */
 export function DemoBanner() {
-  const [demo, setDemo] = React.useState(false);
-
-  React.useEffect(() => {
-    let active = true;
-    getHealth()
-      .then((h) => {
-        if (active) setDemo(!!h.demo_mode);
-      })
-      .catch(() => {
-        /* backend offline — no banner */
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
+  const demo = useDemoMode();
 
   if (!demo) return null;
 

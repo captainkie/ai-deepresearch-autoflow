@@ -18,10 +18,25 @@ This covers three things: turning the stack into a **safe demo**, testing
   keys needed — the whole pipeline runs deterministically offline);
 - **refuse** credential creation, master-key rotation, and provider config
   changes (HTTP 403);
+- **refuse email/password sign-up** (HTTP 403) — the demo is **Google-only**, so
+  bots can't create throwaway accounts;
 - report `demo_mode: true` on `GET /api/v1/health`.
 
 The frontend then shows a sticky **"Live demo — mock data, don't enter real API
-keys"** banner, makes Settings read-only, and disables the Admin credential form.
+keys"** banner, makes Settings read-only, disables the Admin credential form,
+replaces the register form with the Google button, and surfaces a one-click
+**demo admin** login on the sign-in page.
+
+**Accounts seeded on an empty demo DB:**
+
+| Account | Role | Credentials | For |
+|---|---|---|---|
+| Private superadmin | `superadmin` | `AUTOFLOW_DEMO_ADMIN_*` (kept by the operator) | full control |
+| Published demo admin | `admin` | `AUTOFLOW_DEMO_PUBLIC_ADMIN_*` (shown on the login page) | visitors exploring the admin panel |
+
+The published admin can browse users / audit / the credentials screen but **can't**
+save keys (403) or touch the superadmin. Its blast radius is bounded by mock-only
+providers, per-client rate limits, and the scheduled reset below.
 
 Run the demo stack locally:
 
@@ -72,8 +87,10 @@ whitelists the frontend origin in `AUTOFLOW_CORS_ORIGINS`, so cross-origin
    `render.yaml` (service `autoflow-demo-api`, demo mode, `/api/v1/health`
    health check).
 2. Set the `sync:false` secrets in the dashboard: `AUTOFLOW_DEMO_ADMIN_PASSWORD`
-   (seeds the demo superadmin each boot), `GOOGLE_CLIENT_ID`,
-   `GOOGLE_CLIENT_SECRET`.
+   (seeds the private superadmin each boot), `AUTOFLOW_DEMO_RESET_TOKEN` (shared
+   secret for the scheduled reset), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`.
+   The published demo-admin login (`AUTOFLOW_DEMO_PUBLIC_ADMIN_*`) ships as plain
+   `value:` in `render.yaml` — it's public on purpose.
 3. Add the custom domain `api.autoflow-research.fosivo.com` (Render → Settings →
    Custom Domains); create the matching `CNAME → <svc>.onrender.com` in
    Cloudflare **DNS-only** (grey cloud) so Render can issue the cert.
@@ -121,9 +138,19 @@ so local dev and the hosted demo both work.
 
 - **Availability:** always-on (Vercel + Render free tiers). Render's free
   instance cold-starts after idle, so the first request may take a few seconds.
-- **Resetting demo data:** Render's free disk is ephemeral, so the demo DB
-  resets on redeploy and the `AUTOFLOW_DEMO_ADMIN_*` seed recreates the admin.
-  Locally, swap in a fresh DB (`backend/data/`) or wire a scheduled reset.
+- **Resetting demo data:** the demo DB resets on redeploy (ephemeral disk), and a
+  scheduled **GitHub Actions** job
+  ([`.github/workflows/demo-reset.yml`](../.github/workflows/demo-reset.yml), every
+  6 h) POSTs to the token-guarded `POST /api/v1/demo/reset`, which wipes all data
+  and re-seeds the demo accounts. Set repo secret `DEMO_RESET_TOKEN` to match
+  `AUTOFLOW_DEMO_RESET_TOKEN` on Render. `schedule` only fires on the **default
+  branch**, so the cron activates once merged to `main` (run it by hand from the
+  Actions tab meanwhile).
+- **Anti-abuse:** the API sits behind **Cloudflare** (proxied — DDoS protection,
+  hidden origin, trustworthy client IP for rate-limit keying); auth **and** run
+  creation are **rate-limited per client**; email sign-up is disabled (Google-only);
+  and the DB is wiped on a schedule. Mock-only providers mean abuse can't run up any
+  provider cost.
 - **Why split origins (frontend + `api.` subdomain)?** Two independent hosts
   can't share a cookie unless they're same-site, so the API lives on the `api.`
   subdomain of the frontend — same registrable domain → the refresh cookie stays

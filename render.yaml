@@ -33,6 +33,18 @@ services:
         value: demo@autoflow-research.fosivo.com
       - key: AUTOFLOW_DEMO_ADMIN_PASSWORD
         sync: false
+      # A published admin-role login shown on the demo so visitors can explore the
+      # admin panel (users, audit, credentials screen). These values are public on
+      # purpose — safe because the demo is mock-only, rate-limited, and reset on a
+      # schedule. Keep in sync with frontend/lib/demo.ts.
+      - key: AUTOFLOW_DEMO_PUBLIC_ADMIN_EMAIL
+        value: demo-admin@autoflow-research.fosivo.com
+      - key: AUTOFLOW_DEMO_PUBLIC_ADMIN_PASSWORD
+        value: autoflow-demo-admin
+      # Shared secret for POST /api/v1/demo/reset — the scheduled job in
+      # .github/workflows/demo-reset.yml sends it to wipe the ephemeral demo DB.
+      - key: AUTOFLOW_DEMO_RESET_TOKEN
+        sync: false
       # Google OAuth (set in the dashboard; the redirect must be registered on
       # the Google client and point at the API's custom domain).
       - key: GOOGLE_CLIENT_ID

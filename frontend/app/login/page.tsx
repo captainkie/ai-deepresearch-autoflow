@@ -20,9 +20,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { loginSchema, type LoginValues } from "@/lib/schemas";
+import { DEMO_ADMIN } from "@/lib/demo";
+import { useDemoMode } from "@/lib/use-demo-mode";
 
 export default function LoginPage() {
   const { login } = useAuth();
+  const demo = useDemoMode();
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: { email: "", password: "" },
@@ -38,6 +41,12 @@ export default function LoginPage() {
           err instanceof Error ? err.message : "Check your email and password.",
       });
     }
+  }
+
+  async function loginAsDemoAdmin() {
+    form.setValue("email", DEMO_ADMIN.email);
+    form.setValue("password", DEMO_ADMIN.password);
+    await form.handleSubmit(onSubmit)();
   }
 
   return (
@@ -106,6 +115,31 @@ export default function LoginPage() {
       </Form>
 
       <GoogleSignInButton />
+
+      {demo ? (
+        // A shared, published admin-role login so demo visitors can explore the
+        // admin panel + credentials screen. Safe: mock-only, rate-limited, and the
+        // demo DB is reset on a schedule. See lib/demo.ts.
+        <div className="mt-4 rounded-md bg-muted/50 p-3 text-sm ring-1 ring-inset ring-border">
+          <p className="font-medium text-foreground">Explore as a demo admin</p>
+          <p className="mt-1 text-muted-foreground">
+            See the admin panel — users, audit log, and the credentials screen
+            (key entry is disabled in the demo).
+          </p>
+          <p className="mt-2 font-mono text-xs break-all text-muted-foreground">
+            {DEMO_ADMIN.email} · {DEMO_ADMIN.password}
+          </p>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={loginAsDemoAdmin}
+            disabled={form.formState.isSubmitting}
+            className="mt-2 h-9 w-full"
+          >
+            Log in as demo admin
+          </Button>
+        </div>
+      ) : null}
     </AuthShell>
   );
 }

@@ -21,9 +21,11 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { registerSchema, type RegisterValues } from "@/lib/schemas";
+import { useDemoMode } from "@/lib/use-demo-mode";
 
 export default function RegisterPage() {
   const { register } = useAuth();
+  const demo = useDemoMode();
   const form = useForm<RegisterValues>({
     resolver: zodResolver(registerSchema),
     defaultValues: { name: "", email: "", password: "" },
@@ -55,70 +57,84 @@ export default function RegisterPage() {
         </>
       }
     >
-      <Form {...form}>
-        <form
-          onSubmit={form.handleSubmit(onSubmit)}
-          className="space-y-4"
-          noValidate
-        >
-          <FormField
-            control={form.control}
-            name="name"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Name</FormLabel>
-                <FormControl>
-                  <Input autoComplete="name" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input type="email" autoComplete="email" {...field} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <FormField
-            control={form.control}
-            name="password"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Password</FormLabel>
-                <FormControl>
-                  <Input
-                    type="password"
-                    autoComplete="new-password"
-                    {...field}
-                  />
-                </FormControl>
-                <FormDescription>At least 8 characters.</FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-          <Button
-            type="submit"
-            disabled={form.formState.isSubmitting}
-            className="h-10 w-full gap-2"
-          >
-            {form.formState.isSubmitting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : null}
-            Create account
-          </Button>
-        </form>
-      </Form>
+      {demo ? (
+        // Email sign-up is disabled in the demo (Google-only) to keep bots from
+        // creating throwaway accounts; the backend also refuses /auth/register.
+        <div className="space-y-4">
+          <p className="rounded-md bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground ring-1 ring-inset ring-border">
+            Email sign-up is disabled in the live demo. Continue with Google to
+            explore the app as a member.
+          </p>
+          <GoogleSignInButton label="Continue with Google" />
+        </div>
+      ) : (
+        <>
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(onSubmit)}
+              className="space-y-4"
+              noValidate
+            >
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input autoComplete="name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" autoComplete="email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        autoComplete="new-password"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>At least 8 characters.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button
+                type="submit"
+                disabled={form.formState.isSubmitting}
+                className="h-10 w-full gap-2"
+              >
+                {form.formState.isSubmitting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
+                Create account
+              </Button>
+            </form>
+          </Form>
 
-      <GoogleSignInButton label="Sign up with Google" />
+          <GoogleSignInButton label="Sign up with Google" />
+        </>
+      )}
     </AuthShell>
   );
 }
