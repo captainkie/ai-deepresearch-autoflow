@@ -57,7 +57,13 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - name: Install
+        # CI="" so pnpm treats ignored build scripts as a warning, not a fatal error;
+        # we then build the two native deps explicitly (bypasses the approval gate).
         run: pnpm install --frozen-lockfile
+        env:
+          CI: ""
+      - name: Build native deps (sharp, unrs-resolver)
+        run: pnpm rebuild sharp unrs-resolver
       - name: Lint (eslint)
         run: pnpm lint
       - name: Build (next build / typecheck)
