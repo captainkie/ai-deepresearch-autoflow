@@ -12,6 +12,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/captainkie/ai-deepresearch-autoflow/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/captainkie/ai-deepresearch-autoflow/actions/workflows/ci.yml/badge.svg"></a>
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%20%7C%203.12-blue">
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-black">
