@@ -77,6 +77,38 @@ async def test_v2_run_emits_and_persists_claims(app_client):
     assert verifs  # every claim got a verification
 
 
+async def test_entity_run_projects_comparison_and_confidence_summary(app_client):
+    client, app = app_client
+    resp = await client.post(
+        "/api/runs",
+        json={
+            "query": "BrandX vs BrandY",
+            "template": "competitor_brand",  # entity_mode
+            "config": _MOCK,
+            "require_plan_approval": False,
+        },
+    )
+    run_id = resp.json()["run_id"]
+
+    events: list[dict] = []
+    await asyncio.wait_for(_drain(client, run_id, events), timeout=5)
+
+    # Claims were entity-tagged for the comparison pivot.
+    claim_events = [e for e in events if e["type"] == "claim"]
+    assert claim_events
+    assert any(e["data"].get("entity") for e in claim_events)
+
+    # The report is the entity projection: a cited comparison table.
+    report = next(e for e in events if e["type"] == "report")
+    assert "## Comparison" in report["data"]["markdown"]
+
+    # confidence_summary rides on both report and done (wire shape).
+    summary = report["data"]["confidence_summary"]
+    assert set(summary) == {"high", "medium", "low", "contradictions"}
+    done = next(e for e in events if e["type"] == "done")
+    assert done["data"]["confidence_summary"] == summary
+
+
 async def test_verification_level_off_reproduces_legacy(app_client):
     client, app = app_client
     await client.post("/api/config", json={"verification_level": "off"})

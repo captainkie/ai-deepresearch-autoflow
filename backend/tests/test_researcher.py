@@ -58,7 +58,7 @@ async def test_research_emits_expected_events_and_registers_sources():
     )
     researcher = _make_researcher(registry, emitter, RunConfig())
 
-    summary = await researcher.research(section)
+    result = await researcher.research(section)
 
     types = [e.type for e in sink.events]
     assert types[0] == EventType.section_start
@@ -66,7 +66,7 @@ async def test_research_emits_expected_events_and_registers_sources():
     assert EventType.search in types
     assert EventType.source in types
     assert EventType.note in types
-    assert summary
+    assert result.summary
     assert len(registry.all()) >= 1
     assert all(s.section_id == "s1" for s in registry.all())
 
@@ -95,7 +95,7 @@ async def test_v2_light_emits_claim_and_verification_events():
     section = PlanSection(id="s1", title="Overview", goal="Establish background", queries=["q"])
     researcher = _make_researcher(registry, emitter, RunConfig(verification_level="light"))
 
-    summary = await researcher.research(section)
+    result = await researcher.research(section)
 
     types = [e.type for e in sink.events]
     assert EventType.claim in types
@@ -104,7 +104,27 @@ async def test_v2_light_emits_claim_and_verification_events():
     assert types[-1] == EventType.section_done
     # Claim events precede their verifications; notes come after verifications.
     assert types.index(EventType.claim) < types.index(EventType.verification)
-    assert summary
+    assert result.summary
+    # The engine consumes the claim graph off the result to build the report.
+    assert result.claims
+    assert result.verifications
+
+
+async def test_research_v2_entity_mode_tags_claims_in_result():
+    sink = ListSink()
+    registry = SourceRegistry()
+    emitter = EventEmitter("run-ent", sink)
+    section = PlanSection(id="s1", title="BrandX", goal="Compare brands", queries=["q"])
+    researcher = _make_researcher(
+        registry, emitter, RunConfig(verification_level="light", template="competitor_brand")
+    )
+
+    result = await researcher.research(section)
+
+    # entity_mode template → claims carry entity + attribute tags for the table.
+    assert result.claims
+    assert any(c.entity for c in result.claims)
+    assert any(c.attribute for c in result.claims)
 
 
 async def test_off_uses_legacy_path_without_claim_events():
