@@ -48,14 +48,33 @@ export function formatRelative(value?: string | number): string {
   return formatDateTime(value);
 }
 
-/** URL-safe slug for anchoring report headings. */
+/** URL-safe slug for anchoring report headings.
+ *
+ * Unicode-aware: keeps letters/digits from any script (Thai, etc.) so non-Latin
+ * headings don't collapse to an empty slug — an empty id breaks React keys and
+ * `querySelector('#')`. Always returns a deterministic, non-empty value so the
+ * same heading text yields the same anchor everywhere it's referenced. */
 export function slugify(text: string): string {
-  return text
+  const slug = text
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, "")
+    // Keep letters, digits, and combining marks from any script (\p{M} preserves
+    // Thai vowel/tone marks that would otherwise be dropped), plus spaces/hyphens.
+    .replace(/[^\p{L}\p{N}\p{M}\s-]/gu, "")
     .replace(/[\s_-]+/g, "-")
     .replace(/^-+|-+$/g, "");
+  // Fallback for headings that are entirely stripped (e.g. all punctuation/emoji):
+  // a stable hash keeps anchors deterministic without ever emitting "".
+  return slug || `h-${hashText(text)}`;
+}
+
+/** Small deterministic string hash (base-36) — stable across renders. */
+function hashText(text: string): string {
+  let h = 0;
+  for (let i = 0; i < text.length; i++) {
+    h = (Math.imul(31, h) + text.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
 }
 
 export type StatusTone = "neutral" | "active" | "success" | "danger" | "pending";
@@ -75,6 +94,7 @@ const STATUS_MAP: Record<string, StatusMeta> = {
   writing: { label: "Writing report", tone: "active", live: true },
   done: { label: "Complete", tone: "success", live: false },
   error: { label: "Error", tone: "danger", live: false },
+  cancelled: { label: "Cancelled", tone: "neutral", live: false },
 };
 
 export function statusMeta(status: RunStatus): StatusMeta {

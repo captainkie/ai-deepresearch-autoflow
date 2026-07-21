@@ -33,6 +33,7 @@ export function ResearchComposer() {
   const [templates, setTemplates] = React.useState<Template[]>(FALLBACK_TEMPLATES);
   const [loadingTemplates, setLoadingTemplates] = React.useState(true);
   const [selected, setSelected] = React.useState<string>(DEFAULT_TEMPLATE_ID);
+  const [language, setLanguage] = React.useState<"en" | "th">("en");
   const [reviewPlan, setReviewPlan] = React.useState(true);
   const [submitting, setSubmitting] = React.useState(false);
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -67,6 +68,7 @@ export function ResearchComposer() {
       const { run_id } = await createRun({
         query: trimmed,
         template: selected,
+        language,
         require_plan_approval: reviewPlan,
       });
       router.push(`/runs/${run_id}`);
@@ -190,22 +192,57 @@ export function ResearchComposer() {
 
       {/* Actions */}
       <div className="flex flex-col gap-3 px-3 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1">
-          <Switch
-            checked={reviewPlan}
-            onCheckedChange={setReviewPlan}
-            aria-label="Review the plan before research starts"
-          />
-          <span className="text-sm">
-            <span className="font-medium text-foreground">Review the plan first</span>
-            <span className="ml-1.5 text-muted-foreground">
-              Approve or edit before searching begins
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+          {/* Output language */}
+          <div
+            role="radiogroup"
+            aria-label="Report language"
+            className="inline-flex items-center rounded-lg border border-border/70 bg-card p-0.5"
+          >
+            {(
+              [
+                { id: "en", label: "EN" },
+                { id: "th", label: "ไทย" },
+              ] as const
+            ).map((opt) => {
+              const active = language === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => setLanguage(opt.id)}
+                  className={cn(
+                    "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-lg px-1 py-1">
+            <Switch
+              checked={reviewPlan}
+              onCheckedChange={setReviewPlan}
+              aria-label="Review the plan before research starts"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-foreground">Review the plan first</span>
+              <span className="ml-1.5 hidden text-muted-foreground sm:inline">
+                Approve or edit before searching begins
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+        </div>
 
         <div className="flex items-center gap-3">
-          <kbd className="hidden rounded border border-border bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground sm:inline-block">
+          <kbd className="hidden shrink-0 whitespace-nowrap rounded border border-border bg-muted px-1.5 py-0.5 text-[0.7rem] text-muted-foreground sm:inline-block">
             ⌘ + ↵
           </kbd>
           <Button

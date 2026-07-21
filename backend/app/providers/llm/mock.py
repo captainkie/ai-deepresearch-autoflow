@@ -31,6 +31,15 @@ def _marker(messages: list[dict], name: str) -> str | None:
     return None
 
 
+def _wants_thai(messages: list[dict]) -> bool:
+    """Detect the Thai ``language_directive`` the planner/synthesizer inject.
+
+    Real providers honour the directive naturally; the mock has to look for it so
+    the offline demo actually renders Thai when the user picks ไทย.
+    """
+    return any("in Thai" in str(m.get("content", "")) for m in messages)
+
+
 class MockLLMProvider:
     def __init__(self, model: str = "mock-1") -> None:
         self.model = model
@@ -104,6 +113,18 @@ class MockLLMProvider:
         title = (
             _marker(messages, "OBJECTIVE") or _marker(messages, "QUERY") or "Deep Research Report"
         )
+        if _wants_thai(messages):
+            return (
+                f"# {title}\n\n"
+                "## บทสรุปผู้บริหาร\n"
+                f"รายงานนี้วิเคราะห์ {title} โดยอ้างอิงจากแหล่งข้อมูลที่รวบรวมมา [1]\n\n"
+                "## ผลการค้นพบสำคัญ\n"
+                "- ประเด็นแรก มีหลักฐานสนับสนุนจากการวิจัย [1]\n"
+                "- ประเด็นที่สอง พร้อมบริบทและการเปรียบเทียบเพิ่มเติม [2]\n\n"
+                "## บทสรุป\n"
+                "การวิเคราะห์ชี้ให้เห็นข้อมูลเชิงลึกที่ชัดเจนและนำไปใช้ได้จริงสำหรับผู้อ่าน\n\n"
+                "## แหล่งอ้างอิง\n"
+            )
         return (
             f"# {title}\n\n"
             "## Executive Summary\n"

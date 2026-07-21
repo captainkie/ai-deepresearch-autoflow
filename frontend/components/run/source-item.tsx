@@ -19,11 +19,15 @@ export function SourceItem({
   const [imgOk, setImgOk] = React.useState(true);
   const domain = domainFromUrl(source.url);
   const favicon = faviconUrl(source.url);
+  // source.url comes from the (untrusted) search/LLM pipeline — only allow
+  // real web links as an href so a `javascript:`/`data:` URL can't execute on
+  // click. An unsafe URL renders as a non-navigable card.
+  const safeHref = /^https?:\/\//i.test(source.url) ? source.url : undefined;
 
   return (
     <a
-      href={source.url}
-      target="_blank"
+      href={safeHref}
+      target={safeHref ? "_blank" : undefined}
       rel="noopener noreferrer"
       className={cn(
         "group flex items-start gap-2.5 rounded-lg border border-border/60 bg-card/60 p-2.5 transition-all hover:border-primary/40 hover:bg-accent/40",

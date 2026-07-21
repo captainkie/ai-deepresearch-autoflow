@@ -98,6 +98,7 @@ export type ConfigUpdate = Partial<{
 export type CreateRun = {
   query: string;
   template?: string; // default "deep_research"
+  language?: string; // "en" | "th" — default from server config
   require_plan_approval?: boolean; // default from config
   config?: {
     llm_provider?: string;
@@ -114,6 +115,7 @@ export type RunStatus =
   | "writing"
   | "done"
   | "error"
+  | "cancelled"
   | string;
 
 export type RunSummary = {

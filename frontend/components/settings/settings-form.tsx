@@ -49,7 +49,26 @@ import {
 } from "@/components/ui/empty";
 import { getConfig, updateConfig } from "@/lib/api";
 import type { ConfigResponse, ConfigUpdate } from "@/lib/types";
+import {
+  LLM_PROVIDERS,
+  SEARCH_PROVIDERS,
+  PROVIDER_MODELS,
+  providerLabel,
+  defaultModelFor,
+} from "@/lib/providers";
 import { cn } from "@/lib/utils";
+
+const CUSTOM_MODEL = "__custom__";
+
+/** All known providers ∪ whatever the backend reports, each tagged available. */
+function providerOptions(
+  known: readonly string[],
+  available: string[],
+  current?: string,
+): { id: string; available: boolean }[] {
+  const ids = uniq([...known, ...available, current]);
+  return ids.map((id) => ({ id, available: available.includes(id) }));
+}
 
 type FormState = {
   llm_provider: string;
@@ -187,8 +206,19 @@ export function SettingsForm() {
     );
   }
 
-  const llmProviders = uniq([...config.llm.available, config.llm.provider]);
-  const searchProviders = uniq([...config.search.available, config.search.provider]);
+  const llmOptions = providerOptions(
+    LLM_PROVIDERS,
+    config.llm.available,
+    config.llm.provider,
+  );
+  const searchOptions = providerOptions(
+    SEARCH_PROVIDERS,
+    config.search.available,
+    config.search.provider,
+  );
+  const modelSuggestions = PROVIDER_MODELS[form.llm_provider] ?? [];
+  const modelIsCustom =
+    modelSuggestions.length === 0 || !modelSuggestions.includes(form.llm_model);
 
   return (
     <div className="flex flex-col gap-5">
@@ -221,7 +251,11 @@ export function SettingsForm() {
               <Select
                 value={form.llm_provider}
                 onValueChange={(v) =>
-                  setForm({ ...form, llm_provider: v })
+                  setForm({
+                    ...form,
+                    llm_provider: v,
+                    llm_model: defaultModelFor(v) ?? form.llm_model,
+                  })
                 }
               >
                 <SelectTrigger id="llm-provider" className="sm:w-56">
@@ -229,14 +263,10 @@ export function SettingsForm() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {llmProviders.length === 0 && (
-                      <SelectItem value={form.llm_provider || "none"} disabled>
-                        No providers available
-                      </SelectItem>
-                    )}
-                    {llmProviders.map((p) => (
-                      <SelectItem key={p} value={p} className="capitalize">
-                        {p}
+                    {llmOptions.map(({ id, available }) => (
+                      <SelectItem key={id} value={id} disabled={!available}>
+                        {providerLabel(id)}
+                        {!available ? " · needs key" : ""}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -251,15 +281,54 @@ export function SettingsForm() {
                   The specific model id for the selected provider.
                 </FieldDescription>
               </FieldContent>
-              <Input
-                id="llm-model"
-                value={form.llm_model}
-                onChange={(e) =>
-                  setForm({ ...form, llm_model: e.target.value })
-                }
-                placeholder="e.g. gpt-4o-mini"
-                className="font-mono text-sm sm:w-56"
-              />
+              {modelSuggestions.length > 0 ? (
+                <div className="flex flex-col gap-2 sm:w-56">
+                  <Select
+                    value={modelIsCustom ? CUSTOM_MODEL : form.llm_model}
+                    onValueChange={(v) =>
+                      setForm({
+                        ...form,
+                        llm_model: v === CUSTOM_MODEL ? "" : v,
+                      })
+                    }
+                  >
+                    <SelectTrigger id="llm-model" className="font-mono text-sm">
+                      <SelectValue placeholder="Select a model" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        {modelSuggestions.map((m) => (
+                          <SelectItem key={m} value={m} className="font-mono text-sm">
+                            {m}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value={CUSTOM_MODEL}>Custom…</SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                  {modelIsCustom ? (
+                    <Input
+                      value={form.llm_model}
+                      onChange={(e) =>
+                        setForm({ ...form, llm_model: e.target.value })
+                      }
+                      placeholder="Custom model id"
+                      aria-label="Custom model id"
+                      className="font-mono text-sm"
+                    />
+                  ) : null}
+                </div>
+              ) : (
+                <Input
+                  id="llm-model"
+                  value={form.llm_model}
+                  onChange={(e) =>
+                    setForm({ ...form, llm_model: e.target.value })
+                  }
+                  placeholder="e.g. gpt-4o-mini"
+                  className="font-mono text-sm sm:w-56"
+                />
+              )}
             </Field>
 
             <Field orientation="responsive">
@@ -282,17 +351,10 @@ export function SettingsForm() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
-                    {searchProviders.length === 0 && (
-                      <SelectItem
-                        value={form.search_provider || "none"}
-                        disabled
-                      >
-                        No providers available
-                      </SelectItem>
-                    )}
-                    {searchProviders.map((p) => (
-                      <SelectItem key={p} value={p} className="capitalize">
-                        {p}
+                    {searchOptions.map(({ id, available }) => (
+                      <SelectItem key={id} value={id} disabled={!available}>
+                        {providerLabel(id)}
+                        {!available ? " · needs key" : ""}
                       </SelectItem>
                     ))}
                   </SelectGroup>
@@ -423,14 +485,14 @@ function ProviderRow({
             <span
               key={p}
               className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium capitalize",
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium",
                 isActive
                   ? "bg-primary/12 text-primary"
                   : "bg-secondary/60 text-muted-foreground",
               )}
             >
               {isActive && <span className="size-1.5 rounded-full bg-primary" />}
-              {p}
+              {providerLabel(p)}
             </span>
           );
         })}

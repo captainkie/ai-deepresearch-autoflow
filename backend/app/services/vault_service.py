@@ -156,8 +156,15 @@ class VaultService:
         if not expires_at:
             return False
         try:
-            return datetime.fromisoformat(expires_at) <= datetime.fromisoformat(self._now())
-        except ValueError:
+            exp = datetime.fromisoformat(expires_at)
+            now = datetime.fromisoformat(self._now())
+            # A naive stored timestamp can't be compared to an aware one (raises
+            # TypeError). Assume UTC for a naive expiry so a client that stored a
+            # tz-less value doesn't break key resolution.
+            if exp.tzinfo is None and now.tzinfo is not None:
+                exp = exp.replace(tzinfo=now.tzinfo)
+            return exp <= now
+        except (ValueError, TypeError):
             return False
 
     async def _log(

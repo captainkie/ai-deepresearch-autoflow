@@ -64,6 +64,8 @@ jobs:
         run: pnpm rebuild sharp unrs-resolver
       - name: Lint (eslint)
         run: pnpm lint
+      - name: Test (vitest)
+        run: pnpm test
       - name: Build (next build / typecheck)
         run: pnpm build
 
