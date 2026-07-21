@@ -9,6 +9,7 @@ no time-dependent content. Prompt builders may embed ``QUERY:`` / ``OBJECTIVE:``
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import AsyncIterator
 
 _STREAM_CHUNK = 40
@@ -74,12 +75,79 @@ class MockLLMProvider:
             return "Summary: " + _last_user(messages)[:160]
         if tag == "reflect":
             return json.dumps({"need_more": False, "queries": []})
+        if tag == "claims":
+            return self._claims(messages)
+        if tag == "verify":
+            return self._verify(messages)
+        if tag == "contradiction":
+            return self._contradiction(messages)
         if tag == "compress":
             goal = _marker(messages, "GOAL") or "Section findings"
             return f"### {goal}\n- Key point drawn from the sources. [1]\n- Supporting detail. [2]"
         if tag == "report":
             return self._report(messages)
         return "OK: " + _last_user(messages)[:80]
+
+    def _claims(self, messages: list[dict]) -> str:
+        """Emit one deterministic claim whose quote is a real span of the page."""
+        content = _last_user(messages)
+        page_text = ""
+        if "PAGE CONTENT:\n" in content:
+            page_text = content.split("PAGE CONTENT:\n", 1)[1].split("\nReturn only", 1)[0].strip()
+        quote = page_text[:60].strip()  # a verbatim prefix → passes the grounding check
+        if not quote:
+            return json.dumps({"claims": []})
+        entity = attribute = None
+        if "ENTITY_MODE: true" in content:
+            entity = _marker(messages, "PAGE TITLE") or "Entity"
+            attrs = _marker(messages, "ATTRIBUTES")
+            attribute = attrs.split(",")[0].strip() if attrs else None
+        claim = {
+            "text": "A grounded finding relevant to the goal.",
+            "quote": quote,
+            "entity": entity,
+            "attribute": attribute,
+            "stance": "neutral",
+        }
+        return json.dumps({"claims": [claim]})
+
+    def _verify(self, messages: list[dict]) -> str:
+        """Grounding-only verifier: a claim is 'supported' iff its quote appears
+        in the source text, else 'unsupported' — deterministic and offline."""
+        content = _last_user(messages)
+        source_text = ""
+        if "SOURCE TEXT:\n" in content:
+            source_text = content.split("SOURCE TEXT:\n", 1)[1].split("\n\nCLAIMS", 1)[0]
+        source_norm = " ".join(source_text.split()).lower()
+        verifications = []
+        if "CLAIMS" in content:
+            block = content.split("CLAIMS", 1)[1]
+            for line in block.splitlines():
+                parts = line.split("\t")
+                if len(parts) < 2:
+                    continue
+                claim_id, quote = parts[0].strip(), parts[1]
+                supported = " ".join(quote.split()).lower() in source_norm
+                verifications.append(
+                    {
+                        "claim_id": claim_id,
+                        "verdict": "supported" if supported else "unsupported",
+                        "confidence": 0.9 if supported else 0.2,
+                        "rationale": ("quote found in source" if supported else "quote not found"),
+                    }
+                )
+        return json.dumps({"verifications": verifications})
+
+    def _contradiction(self, messages: list[dict]) -> str:
+        """Two claims conflict (deterministically) iff they cite different numeric
+        values (e.g. $9 vs $12) for the same attribute."""
+        a = _marker(messages, "CLAIM_A") or ""
+        b = _marker(messages, "CLAIM_B") or ""
+        nums_a = set(re.findall(r"\d+", a))
+        nums_b = set(re.findall(r"\d+", b))
+        conflict = bool(nums_a and nums_b and nums_a != nums_b)
+        note = f"{a.strip()} vs {b.strip()}" if conflict else ""
+        return json.dumps({"conflict": conflict, "note": note})
 
     def _plan(self, messages: list[dict]) -> str:
         query = _marker(messages, "QUERY") or (_last_user(messages)[:120] or "the topic")

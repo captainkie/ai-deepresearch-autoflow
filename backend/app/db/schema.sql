@@ -40,7 +40,28 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
   id TEXT PRIMARY KEY, user_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
   expires_at TEXT NOT NULL, revoked_at TEXT, user_agent TEXT, created_at TEXT NOT NULL
 );
+-- Engine v2 (M3.5): claim-grounded verification.
+CREATE TABLE IF NOT EXISTS claims (
+  run_id TEXT NOT NULL, id TEXT NOT NULL, section_id TEXT,
+  text TEXT NOT NULL, entity TEXT, attribute TEXT, quote TEXT, stance TEXT,
+  created_at TEXT NOT NULL, PRIMARY KEY (run_id, id)
+);
+CREATE TABLE IF NOT EXISTS claim_sources (
+  run_id TEXT NOT NULL, claim_id TEXT NOT NULL, ref_num INTEGER NOT NULL,
+  PRIMARY KEY (run_id, claim_id, ref_num)
+);
+CREATE TABLE IF NOT EXISTS verifications (
+  run_id TEXT NOT NULL, claim_id TEXT NOT NULL,
+  verdict TEXT NOT NULL, confidence REAL, rationale TEXT, verifier_model TEXT,
+  created_at TEXT NOT NULL, PRIMARY KEY (run_id, claim_id)
+);
+CREATE TABLE IF NOT EXISTS contradictions (
+  run_id TEXT NOT NULL, id TEXT NOT NULL, entity TEXT, attribute TEXT,
+  claim_id_a TEXT NOT NULL, claim_id_b TEXT NOT NULL, note TEXT,
+  PRIMARY KEY (run_id, id)
+);
 CREATE INDEX IF NOT EXISTS idx_runs_created ON runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_claims_run ON claims(run_id, section_id);
 CREATE INDEX IF NOT EXISTS idx_events_run ON events(run_id, seq);
 CREATE INDEX IF NOT EXISTS idx_cred_provider ON provider_credentials(provider, status);
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at DESC);

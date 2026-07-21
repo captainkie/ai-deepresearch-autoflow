@@ -40,6 +40,10 @@ class EventType(str, Enum):
     report = "report"
     error = "error"
     done = "done"
+    # Engine v2 (M3.5): claim-grounded verification.
+    claim = "claim"
+    verification = "verification"
+    contradiction = "contradiction"
 
 
 class SearchResult(BaseModel):
@@ -91,6 +95,73 @@ class Event(BaseModel):
     data: dict
 
 
+# --- Engine v2 (M3.5): claims, verification, contradictions --------------- #
+
+
+class Verdict(str, Enum):
+    supported = "supported"
+    partial = "partial"
+    unsupported = "unsupported"
+    contradicted = "contradicted"
+
+
+class ConfidenceLevel(str, Enum):
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+
+class Claim(BaseModel):
+    """An atomic, source-grounded assertion — the unit the report is built from.
+
+    Every claim MUST carry ≥1 ``source_ids`` and a ``quote`` copied verbatim from
+    the page, so verification is a grounding check rather than a re-derivation.
+    ``entity``/``attribute`` are set in entity-mode templates so the verified set
+    can be pivoted into a comparison table.
+    """
+
+    id: str
+    text: str
+    source_ids: list[int] = Field(default_factory=list)
+    quote: str = ""
+    section_id: str | None = None
+    entity: str | None = None
+    attribute: str | None = None
+    stance: str | None = None
+
+
+class Verification(BaseModel):
+    """A separate (adversarial) verifier's judgement of one claim vs its source."""
+
+    claim_id: str
+    verdict: Verdict
+    confidence: float = 0.0
+    rationale: str = ""
+    verifier_model: str | None = None
+
+
+class Contradiction(BaseModel):
+    """Two supported claims on the same ``(entity, attribute)`` that disagree."""
+
+    id: str
+    claim_id_a: str
+    claim_id_b: str
+    entity: str | None = None
+    attribute: str | None = None
+    note: str = ""
+
+
+class ConfidenceSummary(BaseModel):
+    """Aggregate verification outcome for a run (attached to ``report``/``done``)."""
+
+    supported: int = 0
+    partial: int = 0
+    unsupported: int = 0
+    contradicted: int = 0
+    total: int = 0
+    overall: ConfidenceLevel | None = None
+
+
 class RunConfig(BaseModel):
     llm_provider: str = "mock"
     llm_model: str = "mock-1"
@@ -99,6 +170,12 @@ class RunConfig(BaseModel):
     language: Language = Language.en
     template: str = "deep_research"
     require_plan_approval: bool = False
+    # Engine v2 verifier (empty ⇒ reuse the main llm_provider/llm_model).
+    verifier_provider: str = ""
+    verifier_model: str = ""
+    # off ⇒ legacy summarize path (no claim/verification events); light|strict ⇒
+    # claim extraction + verification.
+    verification_level: str = "light"
     max_sections: int = 6
     max_iters_per_section: int = 2
     results_per_query: int = 6

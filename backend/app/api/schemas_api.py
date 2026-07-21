@@ -55,6 +55,7 @@ class ConfigResponse(BaseModel):
     llm: LlmConfig
     search: SearchConfig
     require_plan_approval: bool
+    verification_level: str = "light"
 
 
 class ConfigUpdate(BaseModel):
@@ -62,6 +63,7 @@ class ConfigUpdate(BaseModel):
     llm_model: str | None = None
     search_provider: str | None = None
     require_plan_approval: bool | None = None
+    verification_level: str | None = None
 
 
 class TemplateOut(BaseModel):

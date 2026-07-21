@@ -29,7 +29,13 @@ from app.api.schemas_api import CreateRun, PlanSubmit, RunConfigIn
 from app.core.engine import ResearchEngine
 from app.core.events import Sink, now_ms
 from app.db.database import Database
-from app.db.repositories import EventRepo, RunRepo
+from app.db.repositories import (
+    ClaimRepo,
+    ContradictionRepo,
+    EventRepo,
+    RunRepo,
+    VerificationRepo,
+)
 from app.models.schemas import Event, EventType, PlanSection, RunConfig, RunStatus
 from app.providers.crawl.registry import get_crawl_provider
 from app.providers.llm.registry import get_llm_provider
@@ -120,6 +126,9 @@ class RunService:
         self._vault = vault
         self._runs = RunRepo(db)
         self._events = EventRepo(db)
+        self._claims = ClaimRepo(db)
+        self._verifications = VerificationRepo(db)
+        self._contradictions = ContradictionRepo(db)
         self._hubs: dict[str, RunHub] = {}
         self._lock = asyncio.Lock()
         self._client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
@@ -287,6 +296,7 @@ class RunService:
         row = await self._runs.get(run_id)
         if row is None:
             raise LookupError(run_id)
+        current = await self._config.current()
         config = RunConfig(
             llm_provider=row["llm_provider"] or "mock",
             llm_model=row["llm_model"] or "mock-1",
@@ -295,6 +305,7 @@ class RunService:
             language=row["language"] or "en",
             template=row["template"],
             require_plan_approval=bool(row["require_plan_approval"]),
+            verification_level=current.get("verification_level", "light"),
         )
         return row["query"], config
 
@@ -455,6 +466,40 @@ class RunService:
                 url=source.get("url", ""),
                 snippet=source.get("snippet", ""),
                 section_id=source.get("section_id"),
+            )
+        elif et == EventType.claim:
+            await self._claims.create(
+                run_id,
+                id=data["claim_id"],
+                text=data.get("text", ""),
+                source_ids=list(data.get("source_ids", [])),
+                quote=data.get("quote", ""),
+                section_id=data.get("section_id"),
+                entity=data.get("entity"),
+                attribute=data.get("attribute"),
+                stance=data.get("stance"),
+                created_at=now,
+            )
+        elif et == EventType.verification:
+            await self._verifications.upsert(
+                run_id,
+                claim_id=data["claim_id"],
+                verdict=data.get("verdict", ""),
+                confidence=data.get("confidence"),
+                rationale=data.get("rationale", ""),
+                verifier_model=data.get("verifier_model"),
+                created_at=now,
+            )
+        elif et == EventType.contradiction:
+            claim_ids = data.get("claim_ids", ["", ""])
+            await self._contradictions.create(
+                run_id,
+                id=data["id"],
+                claim_id_a=claim_ids[0],
+                claim_id_b=claim_ids[1],
+                entity=data.get("entity"),
+                attribute=data.get("attribute"),
+                note=data.get("note", ""),
             )
         elif et == EventType.section_done:
             await self._runs.set_section_summary(

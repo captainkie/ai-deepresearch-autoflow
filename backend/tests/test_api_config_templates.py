@@ -85,6 +85,15 @@ async def test_post_config_persists(auth_client):
     assert resp.status_code == 200
     assert resp.json()["search"]["provider"] == "duckduckgo"
 
-    # Persisted across requests (same in-memory DB / app.state).
+
+async def test_config_exposes_and_updates_verification_level(auth_client):
+    body = (await auth_client.get("/api/config")).json()
+    assert body["verification_level"] == "light"  # default
+
+    updated = await auth_client.post("/api/config", json={"verification_level": "strict"})
+    assert updated.status_code == 200
+    assert updated.json()["verification_level"] == "strict"
+
+    # Persisted across requests.
     resp2 = await auth_client.get("/api/config")
-    assert resp2.json()["search"]["provider"] == "duckduckgo"
+    assert resp2.json()["verification_level"] == "strict"
