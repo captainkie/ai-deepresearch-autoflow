@@ -5,7 +5,13 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 
 from app.api.deps import get_config_service
-from app.api.schemas_api import ConfigResponse, ConfigUpdate, TemplateOut, TemplatesResponse
+from app.api.schemas_api import (
+    ConfigResponse,
+    ConfigUpdate,
+    EntityFieldOut,
+    TemplateOut,
+    TemplatesResponse,
+)
 from app.prompts.templates import TEMPLATES
 from app.security.rbac import get_current_user, require_admin
 from app.services.config_service import ConfigService
@@ -17,7 +23,17 @@ router = APIRouter(prefix="/api", tags=["config"])
 async def list_templates() -> TemplatesResponse:
     return TemplatesResponse(
         templates=[
-            TemplateOut(id=t.id, name=t.name, description=t.description, audience=t.audience)
+            TemplateOut(
+                id=t.id,
+                name=t.name,
+                description=t.description,
+                audience=t.audience,
+                entity_mode=t.entity_mode,
+                entity_schema=[
+                    EntityFieldOut(key=f.key, label=f.label, type=f.type) for f in t.entity_schema
+                ],
+                verification_level=t.verification_level,
+            )
             for t in TEMPLATES.values()
         ]
     )

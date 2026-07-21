@@ -65,6 +65,23 @@ async def test_templates_endpoint(client):
         assert {"id", "name", "description", "audience"} <= t.keys()
 
 
+async def test_templates_endpoint_exposes_entity_metadata(client):
+    resp = await client.get("/api/templates")
+    assert resp.status_code == 200
+    templates = {t["id"]: t for t in resp.json()["templates"]}
+
+    # An entity-mode template exposes its comparison schema + verification level.
+    comp = templates["competitor_brand"]
+    assert comp["entity_mode"] is True
+    assert comp["entity_schema"]
+    assert all({"key", "label", "type"} <= f.keys() for f in comp["entity_schema"])
+    assert comp["verification_level"] in {"off", "light", "strict"}
+
+    # A plain narrative template reports entity_mode false + an empty schema.
+    assert templates["deep_research"]["entity_mode"] is False
+    assert templates["deep_research"]["entity_schema"] == []
+
+
 async def test_get_config_endpoint(auth_client):
     resp = await auth_client.get("/api/config")
     assert resp.status_code == 200

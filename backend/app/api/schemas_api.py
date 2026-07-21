@@ -66,11 +66,21 @@ class ConfigUpdate(BaseModel):
     verification_level: str | None = None
 
 
+class EntityFieldOut(BaseModel):
+    key: str
+    label: str
+    type: str = "text"
+
+
 class TemplateOut(BaseModel):
     id: str
     name: str
     description: str
     audience: str
+    # Engine v2 (M3.5b): entity_mode templates carry a comparison schema.
+    entity_mode: bool = False
+    entity_schema: list[EntityFieldOut] = Field(default_factory=list)
+    verification_level: str = "light"
 
 
 class TemplatesResponse(BaseModel):
