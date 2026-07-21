@@ -62,7 +62,9 @@ type RunSummary = { run_id: string; query: string; template: string; status: str
 ```
 
 ### `GET /api/runs/{run_id}`
-`200 → RunDetail` — full run incl. `plan`, `sections`, `report` (Markdown), `sources`, `status`.
+`200 → RunDetail` — full run incl. `plan`, `sections`, `report` (Markdown), `sources`, `status`,
+and (Engine v2) `confidence_summary?: ConfidenceSummary` recovered from the stored `report` event
+so a reloaded finished run shows its trust badge without a live stream.
 
 ### `POST /api/runs/{run_id}/plan`
 Approve or replace the plan (only valid while `awaiting_plan`).
