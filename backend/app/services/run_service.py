@@ -97,6 +97,13 @@ class RunHub:
     finished: asyncio.Event = field(default_factory=asyncio.Event)
     approval: asyncio.Future | None = None
     cancelled: bool = False
+    # Single authority for event ``seq`` + write ordering. Every event write
+    # (engine sink and terminal cancel/timeout emits) allocates its seq and
+    # persists/fans-out while holding ``write_lock``, so there is exactly one
+    # monotonic seq source (no collision with the engine's emitter) and live
+    # fan-out order matches seq order.
+    write_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    next_seq: int = 0
 
 
 class RunService:
@@ -312,24 +319,54 @@ class RunService:
                 queue.put_nowait(None)
 
     async def _emit_error(self, run_id: str, hub: RunHub, message: str) -> None:
-        """Persist + fan out an ``error`` event with the next monotonic seq."""
-        seq = await self._events.count_by_run(run_id)
-        event = Event(
-            seq=seq,
-            run_id=run_id,
-            ts=now_ms(),
-            type=EventType.error,
-            data={"message": message},
-        )
-        await self._persist(run_id, event)
-        for queue in list(hub.subscribers):
-            queue.put_nowait(event)
+        """Persist + fan out an ``error`` event (wallclock-timeout path)."""
+        await self._emit_out_of_band(run_id, hub, EventType.error, {"message": message})
 
-    def _make_sink(self, run_id: str, hub: RunHub) -> Sink:
-        async def sink(event: Event) -> None:
+    async def _emit_status(self, run_id: str, hub: RunHub | None, stage: str, message: str) -> None:
+        """Persist + fan out a ``status`` event.
+
+        Used to record a terminal ``cancelled`` state so a client that reconnects
+        replays it as the last event (``_persist`` also flips the run's DB status).
+        """
+        await self._emit_out_of_band(
+            run_id, hub, EventType.status, {"stage": stage, "message": message}
+        )
+
+    async def _emit_out_of_band(
+        self, run_id: str, hub: RunHub | None, type_: EventType, data: dict
+    ) -> None:
+        """Emit an event that originates outside the engine (cancel/timeout).
+
+        Allocates its ``seq`` from the hub's single authority under ``write_lock``
+        so it can never collide with a concurrently-emitting engine (the old
+        ``count_by_run`` path could duplicate a seq and hit the events PK). These
+        are terminal signals, so they are written even when the hub is cancelled.
+        """
+        if hub is None:
+            # Never started (no task/subscribers): no concurrent writer to race.
+            seq = await self._events.count_by_run(run_id)
+            event = Event(seq=seq, run_id=run_id, ts=now_ms(), type=type_, data=data)
+            await self._persist(run_id, event)
+            return
+        async with hub.write_lock:
+            event = Event(seq=hub.next_seq, run_id=run_id, ts=now_ms(), type=type_, data=data)
+            hub.next_seq += 1
             await self._persist(run_id, event)
             for queue in list(hub.subscribers):
                 queue.put_nowait(event)
+
+    def _make_sink(self, run_id: str, hub: RunHub) -> Sink:
+        async def sink(event: Event) -> None:
+            async with hub.write_lock:
+                # Drop anything the engine emits after cancellation so a late
+                # done/error can't overwrite the terminal 'cancelled' state.
+                if hub.cancelled:
+                    return
+                event.seq = hub.next_seq
+                hub.next_seq += 1
+                await self._persist(run_id, event)
+                for queue in list(hub.subscribers):
+                    queue.put_nowait(event)
 
         return sink
 
@@ -348,7 +385,7 @@ class RunService:
     async def submit_plan(self, run_id: str, submit: PlanSubmit) -> bool:
         """Resolve a paused run's plan future. Returns False if not awaiting."""
         hub = self._hubs.get(run_id)
-        if hub is None or hub.approval is None or hub.approval.done():
+        if hub is None or hub.approval is None or hub.approval.done() or hub.cancelled:
             return False
         if submit.sections:
             sections = [
@@ -469,10 +506,27 @@ class RunService:
             hub.subscribers.discard(queue)
 
     async def cancel(self, run_id: str) -> None:
-        await self._runs.update_status(run_id, RunStatus.cancelled.value, _now_iso())
+        row = await self._runs.get(run_id)
+        if row is None or row["status"] in {
+            RunStatus.done.value,
+            RunStatus.error.value,
+            RunStatus.cancelled.value,
+        }:
+            return  # nothing to cancel — unknown or already finished
         hub = self._hubs.get(run_id)
+        # Mark cancelled first so the sink drops any further engine events, then
+        # emit the terminal 'cancelled' status and fan it out BEFORE tearing the
+        # task down. Cancelling the task/approval makes the engine push its
+        # end-of-stream sentinel, which would otherwise close the subscriber
+        # stream before the cancelled event is delivered.
         if hub is not None:
             hub.cancelled = True
+        await self._emit_status(run_id, hub, RunStatus.cancelled.value, "Cancelled")
+        if hub is not None:
+            # Unblock a pending plan-approval wait so a racing submit_plan can't
+            # 'succeed' on a cancelled run, then stop the background task.
+            if hub.approval is not None and not hub.approval.done():
+                hub.approval.cancel()
             if hub.task is not None and not hub.task.done():
                 hub.task.cancel()
 

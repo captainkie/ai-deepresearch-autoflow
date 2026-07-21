@@ -13,7 +13,7 @@
 
 <p align="center">
   <a href="https://github.com/captainkie/ai-deepresearch-autoflow/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/captainkie/ai-deepresearch-autoflow/actions/workflows/ci.yml/badge.svg"></a>
-  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/License-MIT-green.svg"></a>
+  <a href="./LICENSE"><img alt="License: AGPL v3" src="https://img.shields.io/badge/License-AGPL%20v3-blue.svg"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.11%20%7C%203.12-blue">
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-black">
   <a href="https://github.com/sponsors/captainkie"><img alt="Sponsor" src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-ff69b4"></a>
@@ -62,7 +62,8 @@ frontend → admin panel → CI & docs.
 
 ## Authors
 
-Built by **Narenrit Hadsadintorn** ([@captainkie](https://github.com/captainkie)) together
+A product of **[Fosivo Labs Co., Ltd.](https://fosivo.com)**, built by
+**Narenrit Hadsadintorn** ([@captainkie](https://github.com/captainkie)) together
 with **Claude** (Anthropic) as an AI pair-builder. Both are credited in-app on the
 **About / Credits** page and in the site footer.
 
@@ -84,4 +85,7 @@ If this project is useful to you, consider supporting its development 💛
 
 ## License
 
-[MIT](./LICENSE) © 2026 Narenrit Hadsadintorn
+**AGPL-3.0** © 2026 **Fosivo Labs Co., Ltd.** — see [LICENSE](./LICENSE).
+
+Also available under a separate **[commercial license](./COMMERCIAL-LICENSE.md)**
+for use in closed-source products or hosted services without AGPL obligations.

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.__about__ import ACKNOWLEDGEMENTS, APP_NAME, AUTHORS, LICENSE, VERSION
+from app.__about__ import ACKNOWLEDGEMENTS, APP_NAME, AUTHORS, LICENSE, ORG, VERSION
 from app.api.schemas_api import AboutResponse, HealthResponse
 
 router = APIRouter(prefix="/api", tags=["health"])
@@ -21,6 +21,7 @@ async def about() -> AboutResponse:
         app=APP_NAME,
         version=VERSION,
         license=LICENSE,
+        org=ORG,
         authors=AUTHORS,
         acknowledgements=ACKNOWLEDGEMENTS,
     )

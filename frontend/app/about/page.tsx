@@ -29,8 +29,18 @@ export default function AboutPage() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-12 sm:px-6">
-      <div className="mb-10 flex flex-col items-center gap-3 text-center">
+      <div className="mb-10 flex flex-col items-center gap-2 text-center">
         <BrandLockup />
+        {about ? (
+          <a
+            href={about.org.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-sm font-medium text-foreground transition-colors hover:text-primary"
+          >
+            A product of {about.org.name}
+          </a>
+        ) : null}
         <p className="text-sm text-muted-foreground">
           {about ? `v${about.version} · ${about.license} licensed` : "Deep research your team can trust"}
         </p>

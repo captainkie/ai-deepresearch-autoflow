@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from app.api.cookies import REFRESH_COOKIE, clear_refresh_cookie, set_refresh_cookie
 from app.api.deps import get_app_settings, get_auth_service, get_oauth_service
+from app.security.ratelimit import rate_limit
 from app.security.rbac import get_current_user
 from app.services.auth_service import AuthService, EmailExistsError
 from app.services.oauth_service import GoogleOAuthService, OAuthError
@@ -48,7 +49,11 @@ async def _session_response(
     return {"user": AuthService.public(user), "access_token": access}
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(rate_limit(5, 60.0, "register"))],
+)
 async def register(
     body: RegisterRequest,
     response: Response,
@@ -65,7 +70,7 @@ async def register(
     return await _session_response(auth, row, response, settings)
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[Depends(rate_limit(10, 60.0, "login"))])
 async def login(
     body: LoginRequest,
     response: Response,
@@ -78,7 +83,7 @@ async def login(
     return await _session_response(auth, row, response, settings)
 
 
-@router.post("/refresh")
+@router.post("/refresh", dependencies=[Depends(rate_limit(30, 60.0, "refresh"))])
 async def refresh(
     request: Request,
     response: Response,
@@ -137,7 +142,10 @@ async def google_start(
     return {"auth_url": url}
 
 
-@router.get("/google/callback")
+@router.get(
+    "/google/callback",
+    dependencies=[Depends(rate_limit(10, 60.0, "google_callback"))],
+)
 async def google_callback(
     request: Request,
     code: str,

@@ -18,6 +18,7 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 
 import { getRun, streamUrl, submitPlan, cancelRun } from "./api";
+import { splitSseFrames, parseSseData } from "./sse";
 import {
   getAccessToken,
   notifyUnauthenticated,
@@ -86,6 +87,7 @@ type Action =
   | { type: "event"; event: ResearchEvent }
   | { type: "report_append"; text: string }
   | { type: "approved" }
+  | { type: "cancelled" }
   | { type: "reset" };
 
 function emptySection(id: string, title = ""): SectionState {
@@ -244,6 +246,8 @@ function reducer(state: StreamState, action: Action): StreamState {
       return { ...state, report: state.report + action.text };
     case "approved":
       return { ...state, awaitingPlan: false };
+    case "cancelled":
+      return { ...state, status: "cancelled", awaitingPlan: false };
     case "reset":
       return INITIAL;
     default:
@@ -436,14 +440,7 @@ export function useResearchStream(
         let buffer = "";
 
         const processFrame = (frame: string) => {
-          const dataLines: string[] = [];
-          for (const line of frame.split(/\r?\n/)) {
-            if (line.startsWith("data:")) {
-              dataLines.push(line.slice(5).replace(/^ /, ""));
-            }
-          }
-          if (!dataLines.length) return;
-          const payload = dataLines.join("\n").trim();
+          const payload = parseSseData(frame);
           if (!payload || payload === "[DONE]") return;
           try {
             handleEvent(JSON.parse(payload) as ResearchEvent);
@@ -456,12 +453,9 @@ export function useResearchStream(
           const { value, done } = await reader.read();
           if (done) break;
           buffer += decoder.decode(value, { stream: true });
-          let sep: number;
-          while ((sep = buffer.indexOf("\n\n")) !== -1) {
-            const frame = buffer.slice(0, sep);
-            buffer = buffer.slice(sep + 2);
-            processFrame(frame);
-          }
+          const { frames, rest } = splitSseFrames(buffer);
+          buffer = rest;
+          for (const frame of frames) processFrame(frame);
         }
         if (buffer.trim()) processFrame(buffer);
         flushReport();
@@ -488,6 +482,10 @@ export function useResearchStream(
     return () => {
       closed = true;
       controller.abort();
+      if (flushTimer.current) {
+        clearTimeout(flushTimer.current);
+        flushTimer.current = null;
+      }
     };
   }, [runId, enabled, attempt, handleEvent, flushReport]);
 
@@ -508,10 +506,16 @@ export function useResearchStream(
   const cancel = useCallback(async () => {
     if (!runId) return;
     await cancelRun(runId);
+    // The server marks the run cancelled and closes the stream, but never emits
+    // a terminal event — reflect the cancellation locally so the UI leaves its
+    // "working" state immediately instead of spinning forever.
+    dispatch({ type: "cancelled" });
   }, [runId]);
 
   const retry = useCallback(() => {
-    seenSeqs.current = new Set();
+    // Keep `seenSeqs` — on reconnect the server replays already-applied events
+    // (incl. report_delta), and clearing it would re-append them and duplicate
+    // the report. Only drop the pending, un-flushed delta buffer.
     reportBuffer.current = "";
     setAttempt((a) => a + 1);
   }, []);

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { AlertTriangle, WifiOff, RotateCcw, Plus } from "lucide-react";
+import { AlertTriangle, WifiOff, RotateCcw, Plus, Ban } from "lucide-react";
 import { toast } from "sonner";
 
 import { useResearchStream } from "@/lib/useResearchStream";
@@ -44,11 +44,17 @@ export function RunView({ runId }: { runId: string }) {
   }
 
   const hasReport = s.report.trim().length > 0;
-  const streaming = hasReport && !s.reportFinal && s.status !== "done";
+  const streaming =
+    hasReport &&
+    !s.reportFinal &&
+    s.status !== "done" &&
+    s.status !== "cancelled" &&
+    s.status !== "error";
   const streamDropped =
     s.connection === "error" &&
     s.status !== "done" &&
     s.status !== "error" &&
+    s.status !== "cancelled" &&
     !s.awaitingPlan;
 
   return (
@@ -175,6 +181,34 @@ function MainContent({
           <AlertTitle>Research ran into a problem</AlertTitle>
           <AlertDescription>
             <span>{error}</span>
+            <Button asChild variant="outline" size="sm" className="mt-1 w-fit gap-1.5">
+              <Link href="/">
+                <Plus className="size-3.5" data-icon="inline-start" />
+                Start a new run
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (status === "cancelled") {
+    return (
+      <div className="space-y-5">
+        {hasReport && (
+          <ReportView markdown={report} title={reportTitle} query={query} />
+        )}
+        <Alert>
+          <Ban />
+          <AlertTitle>Research cancelled</AlertTitle>
+          <AlertDescription>
+            <span>
+              You stopped this run
+              {hasReport
+                ? " — the partial results above are what had been gathered so far."
+                : " before it produced a report."}
+            </span>
             <Button asChild variant="outline" size="sm" className="mt-1 w-fit gap-1.5">
               <Link href="/">
                 <Plus className="size-3.5" data-icon="inline-start" />

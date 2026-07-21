@@ -8,7 +8,8 @@ from __future__ import annotations
 
 APP_NAME = "AI DeepResearch AutoFlow"
 VERSION = "0.1.0"
-LICENSE = "MIT"
+LICENSE = "AGPL-3.0"
+ORG = {"name": "Fosivo Labs Co., Ltd.", "url": "https://fosivo.com"}
 AUTHORS = [
     {"name": "Narenrit Hadsadintorn", "handle": "captainkie", "role": "Author"},
     {"name": "Claude (Anthropic)", "handle": "anthropic", "role": "AI pair-builder"},

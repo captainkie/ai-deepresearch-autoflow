@@ -24,6 +24,12 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# A fixed valid Argon2 hash so `authenticate` can run a verify even when the user
+# is absent/disabled/OAuth-only — equalizing response time so an attacker can't
+# distinguish "no such account" from "wrong password" by latency.
+_DUMMY_PASSWORD_HASH = hash_password("timing-equalizer-not-a-real-password")
+
+
 class AuthError(Exception):
     pass
 
@@ -75,6 +81,9 @@ class AuthService:
     async def authenticate(self, email: str, password: str) -> aiosqlite.Row | None:
         row = await self._users.get_by_email(email.strip().lower())
         if row is None or row["disabled"] or not row["password_hash"]:
+            # Spend the same work on a dummy hash so absent/disabled/OAuth-only
+            # accounts can't be distinguished by response time (user enumeration).
+            verify_password(_DUMMY_PASSWORD_HASH, password)
             return None
         if not verify_password(row["password_hash"], password):
             return None
@@ -104,7 +113,13 @@ class AuthService:
         self, refresh_plain: str, *, user_agent: str | None = None
     ) -> tuple[str, str, aiosqlite.Row] | None:
         row = await self._refresh.get_by_hash(jwt_helper.hash_refresh_token(refresh_plain))
-        if row is None or row["revoked_at"] is not None:
+        if row is None:
+            return None
+        if row["revoked_at"] is not None:
+            # An already-rotated token is being replayed — the hallmark of a
+            # stolen token. Kill the whole family so both the thief's and the
+            # victim's sessions die (they re-login; the theft is contained).
+            await self._refresh.revoke_all_for_user(row["user_id"], self._now())
             return None
         if self._is_expired(row["expires_at"]):
             return None
@@ -133,6 +148,11 @@ class AuthService:
 
     async def count_users(self) -> int:
         return await self._users.count()
+
+    async def count_active_superadmins(self) -> int:
+        return sum(
+            1 for u in await self._users.list() if u["role"] == "superadmin" and not u["disabled"]
+        )
 
     # --- user management (admin) ------------------------------------------- #
 

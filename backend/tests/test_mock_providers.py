@@ -55,3 +55,29 @@ async def test_mock_llm_reflect_stops():
     data = extract_json(out)
     assert data["need_more"] is False
     assert data["queries"] == []
+
+
+async def test_mock_llm_report_is_english_by_default():
+    text = "".join(
+        [
+            c
+            async for c in MockLLMProvider().stream(
+                [{"role": "user", "content": "OBJECTIVE: brand X"}], tag="report"
+            )
+        ]
+    )
+    assert "Executive Summary" in text
+    assert "บทสรุป" not in text
+
+
+async def test_mock_llm_report_renders_thai_when_directive_present():
+    # The Thai language_directive ("Write the report in Thai.") makes the mock
+    # provider render Thai — so the offline demo actually reflects the chosen
+    # language instead of always returning English.
+    messages = [
+        {"role": "system", "content": "You are a writer. Write the report in Thai."},
+        {"role": "user", "content": "OBJECTIVE: brand X"},
+    ]
+    text = "".join([c async for c in MockLLMProvider().stream(messages, tag="report")])
+    assert "บทสรุปผู้บริหาร" in text  # Thai "Executive Summary"
+    assert "Executive Summary" not in text

@@ -65,13 +65,19 @@ async def test_templates_endpoint(client):
         assert {"id", "name", "description", "audience"} <= t.keys()
 
 
-async def test_get_config_endpoint(client):
-    resp = await client.get("/api/config")
+async def test_get_config_endpoint(auth_client):
+    resp = await auth_client.get("/api/config")
     assert resp.status_code == 200
     body = resp.json()
     assert "mock" in body["llm"]["available"]
     assert "mock" in body["search"]["available"]
     assert "require_plan_approval" in body
+
+
+async def test_get_config_requires_auth(client):
+    # Config reveals which providers are wired up — gate it behind a session.
+    resp = await client.get("/api/config")
+    assert resp.status_code == 401
 
 
 async def test_post_config_persists(auth_client):

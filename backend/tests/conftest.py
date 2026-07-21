@@ -23,6 +23,7 @@ def app_settings() -> AppSettings:
         cors_origins=["http://localhost:3000"],
         default_language="en",
         default_require_plan_approval=True,
+        rate_limit_enabled=False,
     )
 
 

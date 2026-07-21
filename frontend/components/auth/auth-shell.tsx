@@ -12,7 +12,7 @@ export function AuthShell({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-9rem)] w-full max-w-md flex-col justify-center px-4 py-10">
+    <div className="mx-auto flex min-h-full w-full max-w-md flex-col justify-center px-4 py-8">
       <div className="mb-6 flex justify-center">
         <BrandLockup />
       </div>

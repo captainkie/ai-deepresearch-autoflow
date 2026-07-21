@@ -11,6 +11,7 @@ import {
   rotateMasterKey,
 } from "@/lib/api";
 import type { Credential } from "@/lib/types";
+import { providerLabel } from "@/lib/providers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,6 +42,7 @@ export function CredentialsPanel() {
   const [provider, setProvider] = React.useState(PROVIDERS[0]);
   const [label, setLabel] = React.useState("");
   const [secret, setSecret] = React.useState("");
+  const [expiresOn, setExpiresOn] = React.useState("");
   const [adding, setAdding] = React.useState(false);
   const [pendingKey, setPendingKey] = React.useState<string | null>(null);
   const [rotating, setRotating] = React.useState(false);
@@ -65,9 +67,21 @@ export function CredentialsPanel() {
     if (!secret.trim() || adding) return;
     setAdding(true);
     try {
-      await createCredential({ provider, label: label.trim() || provider, secret });
+      // A <input type="date"> yields "YYYY-MM-DD". Treat it as end-of-day in the
+      // admin's *local* time (so the date shown back matches what they picked),
+      // then serialize to an aware UTC ISO string the backend can compare safely.
+      const expires_at = expiresOn
+        ? new Date(`${expiresOn}T23:59:59`).toISOString()
+        : null;
+      await createCredential({
+        provider,
+        label: label.trim() || provider,
+        secret,
+        expires_at,
+      });
       setSecret("");
       setLabel("");
+      setExpiresOn("");
       toast.success("Credential added");
       await load();
     } catch (err) {
@@ -116,7 +130,7 @@ export function CredentialsPanel() {
         <p className="mb-3 flex items-center gap-1.5 text-sm font-medium">
           <Plus className="size-4 text-primary" /> Add a provider key
         </p>
-        <div className="grid gap-3 sm:grid-cols-[10rem_12rem_1fr_auto] sm:items-end">
+        <div className="grid gap-3 sm:grid-cols-[8rem_9rem_minmax(0,1fr)_9.5rem_auto] sm:items-end">
           <div className="space-y-1">
             <Label htmlFor="cred-provider" className="text-xs">
               Provider
@@ -129,7 +143,7 @@ export function CredentialsPanel() {
             >
               {PROVIDERS.map((p) => (
                 <option key={p} value={p}>
-                  {p}
+                  {providerLabel(p)}
                 </option>
               ))}
             </select>
@@ -157,6 +171,18 @@ export function CredentialsPanel() {
               required
               value={secret}
               onChange={(e) => setSecret(e.target.value)}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="cred-expires" className="text-xs">
+              Expires <span className="text-muted-foreground">(optional)</span>
+            </Label>
+            <Input
+              id="cred-expires"
+              type="date"
+              value={expiresOn}
+              onChange={(e) => setExpiresOn(e.target.value)}
+              className="h-8"
             />
           </div>
           <Button type="submit" disabled={adding || !secret.trim()} className="h-8">
@@ -224,6 +250,7 @@ export function CredentialsPanel() {
               <Th>Label</Th>
               <Th>Key</Th>
               <Th>Status</Th>
+              <Th>Expires</Th>
               <Th>Last used</Th>
               <Th className="text-right">Actions</Th>
             </tr>
@@ -231,20 +258,33 @@ export function CredentialsPanel() {
           <tbody className="divide-y divide-border/60">
             {creds.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-muted-foreground">
+                <td colSpan={7} className="px-3 py-6 text-center text-muted-foreground">
                   No credentials yet.
                 </td>
               </tr>
             ) : null}
             {creds.map((c) => (
               <tr key={c.id} className="hover:bg-muted/20">
-                <Td className="font-medium">{c.provider}</Td>
+                <Td className="font-medium">{providerLabel(c.provider)}</Td>
                 <Td>{c.label}</Td>
                 <Td>
                   <code className="text-xs text-muted-foreground">{c.masked_hint}</code>
                 </Td>
                 <Td>
                   <StatusPill ok={c.status === "active"} labels={["Active", "Revoked"]} />
+                </Td>
+                <Td className="text-xs">
+                  {!c.expires_at ? (
+                    <span className="text-muted-foreground">—</span>
+                  ) : new Date(c.expires_at) < new Date() ? (
+                    <span className="font-medium text-destructive">
+                      {new Date(c.expires_at).toLocaleDateString()} · expired
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">
+                      {new Date(c.expires_at).toLocaleDateString()}
+                    </span>
+                  )}
                 </Td>
                 <Td className="text-xs text-muted-foreground">
                   {c.last_used_at ? new Date(c.last_used_at).toLocaleString() : "—"}

@@ -56,6 +56,7 @@ export function ReportView({
     const el = articleRef.current;
     if (!el) return;
     const headings = toc
+      .filter((t) => t.id)
       .map((t) => el.querySelector<HTMLElement>(`#${CSS.escape(t.id)}`))
       .filter((h): h is HTMLElement => !!h);
     if (!headings.length) return;
@@ -128,9 +129,9 @@ export function ReportView({
               <List className="size-3" /> Contents
             </p>
             <nav className="flex flex-col gap-0.5 border-l border-border">
-              {toc.map((item) => (
+              {toc.map((item, i) => (
                 <a
-                  key={`${item.id}-${item.level}`}
+                  key={`${item.id}-${item.level}-${i}`}
                   href={`#${item.id}`}
                   className={cn(
                     "-ml-px border-l-2 py-1 text-sm leading-snug transition-colors",
