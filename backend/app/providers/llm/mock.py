@@ -74,12 +74,37 @@ class MockLLMProvider:
             return "Summary: " + _last_user(messages)[:160]
         if tag == "reflect":
             return json.dumps({"need_more": False, "queries": []})
+        if tag == "claims":
+            return self._claims(messages)
         if tag == "compress":
             goal = _marker(messages, "GOAL") or "Section findings"
             return f"### {goal}\n- Key point drawn from the sources. [1]\n- Supporting detail. [2]"
         if tag == "report":
             return self._report(messages)
         return "OK: " + _last_user(messages)[:80]
+
+    def _claims(self, messages: list[dict]) -> str:
+        """Emit one deterministic claim whose quote is a real span of the page."""
+        content = _last_user(messages)
+        page_text = ""
+        if "PAGE CONTENT:\n" in content:
+            page_text = content.split("PAGE CONTENT:\n", 1)[1].split("\nReturn only", 1)[0].strip()
+        quote = page_text[:60].strip()  # a verbatim prefix → passes the grounding check
+        if not quote:
+            return json.dumps({"claims": []})
+        entity = attribute = None
+        if "ENTITY_MODE: true" in content:
+            entity = _marker(messages, "PAGE TITLE") or "Entity"
+            attrs = _marker(messages, "ATTRIBUTES")
+            attribute = attrs.split(",")[0].strip() if attrs else None
+        claim = {
+            "text": "A grounded finding relevant to the goal.",
+            "quote": quote,
+            "entity": entity,
+            "attribute": attribute,
+            "stance": "neutral",
+        }
+        return json.dumps({"claims": [claim]})
 
     def _plan(self, messages: list[dict]) -> str:
         query = _marker(messages, "QUERY") or (_last_user(messages)[:120] or "the topic")
