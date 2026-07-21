@@ -6,7 +6,16 @@ the wire shapes the Next.js frontend consumes.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import BaseModel, EmailStr, Field, StringConstraints
+
+# --- Reusable field constraints: the single source of truth for user input. ---
+# Pydantic is Python's schema validator (the backend counterpart to zod on the
+# frontend); these Annotated types keep the rules DRY across auth/setup/admin.
+EmailField = Annotated[EmailStr, Field(max_length=254)]  # RFC 5321 max length
+PasswordField = Annotated[str, Field(min_length=8, max_length=128)]
+NameField = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 
 
 class HealthResponse(BaseModel):

@@ -11,11 +11,12 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.api import API_V1
 from app.api.cookies import set_refresh_cookie
 from app.api.deps import get_app_settings, get_auth_service, get_db
+from app.api.schemas_api import EmailField, NameField, PasswordField
 from app.db.database import Database
 from app.db.repositories import SettingsRepo
 from app.security.ratelimit import rate_limit
@@ -32,9 +33,9 @@ _setup_lock = asyncio.Lock()
 
 
 class SetupRequest(BaseModel):
-    email: str = Field(min_length=3)
-    name: str = Field(min_length=1)
-    password: str = Field(min_length=8)
+    email: EmailField
+    name: NameField
+    password: PasswordField
 
 
 @router.get("/status")

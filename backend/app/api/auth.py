@@ -15,6 +15,7 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 
 from app.api import API_V1
+from app.api.schemas_api import EmailField, NameField, PasswordField
 from app.api.cookies import REFRESH_COOKIE, clear_refresh_cookie, set_refresh_cookie
 from app.api.deps import get_app_settings, get_auth_service, get_oauth_service
 from app.security.ratelimit import rate_limit
@@ -32,14 +33,14 @@ _OAUTH_COOKIE_PATH = f"{API_V1}/auth/google"
 
 
 class RegisterRequest(BaseModel):
-    email: str = Field(min_length=3)
-    name: str = Field(min_length=1)
-    password: str = Field(min_length=8)
+    email: EmailField
+    name: NameField
+    password: PasswordField
 
 
 class LoginRequest(BaseModel):
-    email: str = Field(min_length=3)
-    password: str = Field(min_length=1)
+    email: EmailField
+    password: str = Field(min_length=1)  # any non-empty; the stored hash is authoritative
 
 
 async def _session_response(
