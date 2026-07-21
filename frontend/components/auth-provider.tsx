@@ -37,6 +37,8 @@ type AuthContextValue = {
 const AuthContext = React.createContext<AuthContextValue | null>(null);
 
 export const PUBLIC_ROUTES = ["/login", "/register", "/setup"];
+// Reachable in any auth state (no redirect, no guard) — e.g. the credits page.
+export const ALWAYS_PUBLIC = ["/about"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = React.useState<AuthStatus>("loading");
@@ -84,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [bootstrap]);
 
   React.useEffect(() => {
-    if (status === "loading") return;
+    if (status === "loading" || ALWAYS_PUBLIC.includes(pathname)) return;
     const onPublic = PUBLIC_ROUTES.includes(pathname);
     if (status === "setup" && pathname !== "/setup") router.replace("/setup");
     else if (status === "unauthenticated" && !onPublic) router.replace("/login");

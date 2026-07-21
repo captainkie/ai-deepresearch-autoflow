@@ -8,15 +8,16 @@
 import { usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
-import { PUBLIC_ROUTES, useAuth } from "@/components/auth-provider";
+import { ALWAYS_PUBLIC, PUBLIC_ROUTES, useAuth } from "@/components/auth-provider";
 
 export function RouteGuard({ children }: { children: React.ReactNode }) {
   const { status } = useAuth();
   const pathname = usePathname();
   const onPublic = PUBLIC_ROUTES.includes(pathname);
 
-  const allowed =
-    status === "authenticated"
+  const allowed = ALWAYS_PUBLIC.includes(pathname)
+    ? true
+    : status === "authenticated"
       ? !onPublic
       : status === "setup"
         ? pathname === "/setup"

@@ -36,6 +36,48 @@ export type SetupStatus = { needs_setup: boolean };
 
 export type Session = { user: User; access_token: string };
 
+// ---------------------------------------------------------------------------
+// Admin — credentials, audit, about
+// ---------------------------------------------------------------------------
+
+export type Credential = {
+  id: string;
+  provider: string;
+  label: string;
+  masked_hint: string;
+  status: "active" | "revoked";
+  key_version: number;
+  created_by: string | null;
+  created_at: string;
+  expires_at: string | null;
+  last_used_at: string | null;
+};
+
+export type AuditEntry = {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  meta_json: string | null;
+  created_at: string;
+};
+
+export type Author = { name: string; handle?: string; role?: string };
+export type Acknowledgement = {
+  name: string;
+  url?: string;
+  license?: string;
+  description?: string;
+};
+export type About = {
+  app: string;
+  version: string;
+  license: string;
+  authors: Author[];
+  acknowledgements: Acknowledgement[];
+};
+
 export type ConfigResponse = {
   llm: { provider: string; model: string; available: string[] };
   search: { provider: string; available: string[] };
