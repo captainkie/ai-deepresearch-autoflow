@@ -25,7 +25,13 @@ def test_templates_present():
 def test_engine_v2_template_set_present():
     # M3.5b ships the structured marketing set (Competitor Teardown maps to the
     # existing competitor_brand key so older runs/tests keep working).
-    for key in ("deep_research", "competitor_brand", "market_landscape", "swot", "pricing_analysis"):
+    for key in (
+        "deep_research",
+        "competitor_brand",
+        "market_landscape",
+        "swot",
+        "pricing_analysis",
+    ):
         assert key in TEMPLATES
 
 
