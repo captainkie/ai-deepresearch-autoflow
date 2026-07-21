@@ -86,7 +86,16 @@ class MockLLMProvider:
             return f"### {goal}\n- Key point drawn from the sources. [1]\n- Supporting detail. [2]"
         if tag == "report":
             return self._report(messages)
+        if tag == "exec_summary":
+            return self._exec_summary(messages)
         return "OK: " + _last_user(messages)[:80]
+
+    def _exec_summary(self, messages: list[dict]) -> str:
+        """Short, deterministic executive summary for the entity report."""
+        subject = _marker(messages, "OBJECTIVE") or "the subject"
+        if _wants_thai(messages):
+            return f"บทวิเคราะห์ที่ตรวจสอบแล้วของ {subject} ชี้ให้เห็นความแตกต่างสำคัญที่นำไปใช้ได้ [1]"
+        return f"This verified analysis of {subject} surfaces the key differences that matter. [1]"
 
     def _claims(self, messages: list[dict]) -> str:
         """Emit one deterministic claim whose quote is a real span of the page."""

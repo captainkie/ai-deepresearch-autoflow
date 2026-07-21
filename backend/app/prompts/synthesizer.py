@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.models.schemas import PlanSection, ResearchBrief, RunConfig, Source
+from app.models.schemas import Claim, Contradiction, PlanSection, ResearchBrief, RunConfig, Source
 from app.prompts.templates import get_template, language_directive
 
 
@@ -45,6 +45,45 @@ def build_report_messages(
         f"RESEARCH SECTIONS:\n{_format_sections(sections)}\n"
         f"SOURCES:\n{_format_sources(sources)}\n"
         "Write the full report now, ending with the '## Sources' list."
+    )
+    return [
+        {"role": "system", "content": system},
+        {"role": "user", "content": user},
+    ]
+
+
+def build_exec_summary_messages(
+    brief: ResearchBrief,
+    verified_claims: list[Claim],
+    contradictions: list[Contradiction],
+    config: RunConfig,
+) -> list[dict]:
+    """Prompt for the entity report's executive summary.
+
+    Fed ONLY the verified findings so the summary can't introduce unverified
+    material; the deterministic comparison table + appendix are assembled around it.
+    """
+    template = get_template(config.template)
+    system = (
+        "You are an expert research writer. Write ONLY a concise executive summary "
+        "(2-4 sentences) of the verified findings below. Do not introduce any fact "
+        "that is not in the findings. Cite sources inline as '[n]'. "
+        f"{language_directive(config.language)}"
+    )
+    findings = (
+        "\n".join(f"- {c.text} " + "".join(f"[{s}]" for s in c.source_ids) for c in verified_claims)
+        or "(no verified findings)"
+    )
+    contra = (
+        f"\nNOTE: {len(contradictions)} unresolved contradiction(s) across sources."
+        if contradictions
+        else ""
+    )
+    user = (
+        f"OBJECTIVE: {brief.objective}\n"
+        f"AUDIENCE: {brief.audience or template.audience}\n"
+        f"VERIFIED FINDINGS:\n{findings}{contra}\n"
+        "Write the executive summary now."
     )
     return [
         {"role": "system", "content": system},
