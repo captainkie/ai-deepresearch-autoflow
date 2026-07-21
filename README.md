@@ -48,6 +48,23 @@ contradictions** rather than asking you to trust a wall of text.
 
 ---
 
+## 🌐 Try the live demo
+
+**[autoflow-research.fosivo.com](https://autoflow-research.fosivo.com)** — a hosted, safe sandbox.
+
+- **Sign in with Google**, or create an account — either way you join as a `member` and can start a
+  research run right away.
+- It runs on **mock providers only**: the full plan → research → verify → report pipeline plays out
+  deterministically, with no real web search or LLM calls. **Don't enter real API keys or anything
+  sensitive** — a banner says so on every page, and key entry / provider switching is disabled.
+- The demo database is **ephemeral** (resets on redeploy) and the backend is **rate-limited per
+  client**, so shared use can't run up cost or pile up data.
+
+> Frontend on Vercel, backend on Render (free tier — the first request after idle may cold-start for
+> a few seconds). Steps to stand up your own hosted demo are in [`docs/DEMO.md`](docs/DEMO.md).
+
+---
+
 ## Quick start (Docker)
 
 The fastest way to run the whole stack (backend + frontend, hot-reload) is Docker Compose.
