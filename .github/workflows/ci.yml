@@ -44,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           # Pinned to the version that wrote the lockfile and reads
           # onlyBuiltDependencies from pnpm-workspace.yaml (so sharp / unrs-resolver
