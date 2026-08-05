@@ -17,7 +17,7 @@ dependencies = [
     "ddgs>=9.0",
     "python-multipart>=0.0.12",
     "aiosqlite>=0.20",
-    "cryptography>=43",
+    "cryptography>=50.0.0",
     "argon2-cffi>=23",
     "pyjwt>=2.9",
 ]
